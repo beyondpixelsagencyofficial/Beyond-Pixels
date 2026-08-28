@@ -1,0 +1,63 @@
+@import "tailwindcss";
+
+@layer base {
+  html {
+    scroll-behavior: smooth;
+    font-family: -apple-system, BlinkMacSystemFont, 'Inter', 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+
+  body {
+    background-color: #050505;
+    color: #F0F0F0;
+    @apply transition-colors duration-200 antialiased selection:bg-[#00F0FF]/25 selection:text-[#00F0FF];
+  }
+}
+
+/* Custom Clean Minimalism Utilities */
+.dark {
+  color-scheme: dark;
+}
+
+.bg-dark-base {
+  background-color: #050505;
+}
+
+.bg-dark-surface {
+  background-color: #0D0D0D;
+}
+
+.bg-dark-card {
+  background-color: #121212;
+}
+
+.border-dark-subtle {
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.glow-cyan {
+  box-shadow: 0 0 30px -4px rgba(0, 240, 255, 0.2);
+}
+
+.glow-violet {
+  box-shadow: 0 0 30px -4px rgba(112, 0, 255, 0.2);
+}
+
+/* Minimalist scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: #050505;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #262626;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #404040;
+}
+
