@@ -613,103 +613,110 @@ app.get('/api/orders/:id', (req: Request, res: Response) => {
 
 // POST Create New Order
 app.post('/api/orders', async (req: Request, res: Response) => {
-  const {
-    clientName,
-    clientEmail,
-    clientPhone,
-    services,
-    packageSelected,
-    adDollarBudget,
-    adDollarRateBDT,
-    deliveryTimeframe,
-    projectDescription,
-    briefFiles = [],
-    estimatedTotalBDT,
-    advanceAmountBDT,
-    estimatedTotal,
-    advanceAmount,
-    paymentMethod,
-    paymentNumber,
-    transactionId
-  } = req.body;
-
-  if (!clientName || !clientEmail || !clientPhone || !services || services.length === 0) {
-    return res.status(400).json({ error: 'Missing required client or service details' });
-  }
-
-  if (!transactionId || transactionId.trim() === '') {
-    return res.status(400).json({ error: 'Transaction ID is required to verify 30% advance payment' });
-  }
-
-  const finalTotalBDT = Number(estimatedTotalBDT || estimatedTotal) || 3500;
-  const finalAdvanceBDT = Number(advanceAmountBDT || advanceAmount) || Math.round(finalTotalBDT * 0.3);
-
-  const newId = `BP-${Math.floor(1000 + Math.random() * 9000)}`;
-  const newOrder = {
-    id: newId,
-    clientName: clientName.trim(),
-    clientEmail: clientEmail.trim().toLowerCase(),
-    clientPhone: clientPhone.trim(),
-    services,
-    packageSelected: packageSelected || undefined,
-    adDollarBudget: adDollarBudget ? Number(adDollarBudget) : undefined,
-    adDollarRateBDT: adDollarRateBDT ? Number(adDollarRateBDT) : undefined,
-    deliveryTimeframe: deliveryTimeframe || 'standard',
-    projectDescription: projectDescription || '',
-    briefFiles: briefFiles || [],
-    estimatedTotalBDT: finalTotalBDT,
-    advanceAmountBDT: finalAdvanceBDT,
-    paymentMethod: paymentMethod || 'bKash',
-    paymentNumber: paymentNumber || '01965407715',
-    transactionId: transactionId.trim().toUpperCase(),
-    status: 'Pending Verification',
-    adminNotes: 'Order submitted. Payment TrxID recorded. Awaiting admin approval.',
-    deliveries: [],
-    createdAt: new Date().toISOString(),
-    updatedAt: new Date().toISOString()
-  };
-
-  ordersData.unshift(newOrder);
-  saveData(ORDERS_FILE, ordersData);
-
-  // Sync to Supabase in background
-  pushOrderToSupabase(newOrder);
-
-  // Auto-sync or register client in users table
   try {
-    const clientEmailNorm = newOrder.clientEmail.toLowerCase().trim();
-    const existingUserIndex = usersData.findIndex(u => u.email.toLowerCase() === clientEmailNorm);
-    const now = new Date().toISOString();
-    
-    if (existingUserIndex >= 0) {
-      const updatedUser: ServerUser = {
-        ...usersData[existingUserIndex],
-        phone: newOrder.clientPhone || usersData[existingUserIndex].phone,
-        lastLoginAt: now
-      };
-      usersData[existingUserIndex] = updatedUser;
-      saveData(USERS_FILE, usersData);
-      pushUserToSupabase(updatedUser);
-    } else {
-      const newUser: ServerUser = {
-        id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
-        name: newOrder.clientName,
-        email: clientEmailNorm,
-        phone: newOrder.clientPhone,
-        avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(newOrder.clientName)}&backgroundColor=0ea5e9,6366f1,10b981`,
-        role: clientEmailNorm === 'beyondpixelsagency.official@gmail.com' ? 'admin' : 'client',
-        createdAt: now,
-        lastLoginAt: now
-      };
-      usersData.unshift(newUser);
-      saveData(USERS_FILE, usersData);
-      pushUserToSupabase(newUser);
-    }
-  } catch (userErr) {
-    console.warn('Auto user register notice on order placement:', userErr);
-  }
+    const {
+      clientName,
+      clientEmail,
+      clientPhone,
+      services,
+      subServices = [],
+      packageSelected,
+      adDollarBudget,
+      adDollarRateBDT,
+      deliveryTimeframe,
+      projectDescription,
+      briefFiles = [],
+      estimatedTotalBDT,
+      advanceAmountBDT,
+      estimatedTotal,
+      advanceAmount,
+      paymentMethod,
+      paymentNumber,
+      transactionId
+    } = req.body;
 
-  res.status(201).json({ success: true, order: newOrder });
+    if (!clientName || !clientEmail || !clientPhone || (!services || services.length === 0) && !packageSelected && (!subServices || subServices.length === 0)) {
+      return res.status(400).json({ error: 'Missing required client or service details' });
+    }
+
+    if (!transactionId || transactionId.trim() === '') {
+      return res.status(400).json({ error: 'Transaction ID is required to verify 30% advance payment' });
+    }
+
+    const finalTotalBDT = Number(estimatedTotalBDT || estimatedTotal) || 3500;
+    const finalAdvanceBDT = Number(advanceAmountBDT || advanceAmount) || Math.round(finalTotalBDT * 0.3);
+
+    const newId = `BP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newOrder = {
+      id: newId,
+      clientName: clientName.trim(),
+      clientEmail: clientEmail.trim().toLowerCase(),
+      clientPhone: clientPhone.trim(),
+      services: services && services.length > 0 ? services : ['Graphic Design'],
+      subServices: Array.isArray(subServices) ? subServices : [],
+      packageSelected: packageSelected || undefined,
+      adDollarBudget: adDollarBudget ? Number(adDollarBudget) : undefined,
+      adDollarRateBDT: adDollarRateBDT ? Number(adDollarRateBDT) : undefined,
+      deliveryTimeframe: deliveryTimeframe || 'standard',
+      projectDescription: projectDescription || '',
+      briefFiles: Array.isArray(briefFiles) ? briefFiles : [],
+      estimatedTotalBDT: finalTotalBDT,
+      advanceAmountBDT: finalAdvanceBDT,
+      paymentMethod: paymentMethod || 'bKash',
+      paymentNumber: paymentNumber || '01965407715',
+      transactionId: transactionId.trim().toUpperCase(),
+      status: 'Pending Verification',
+      adminNotes: 'Order submitted. Payment TrxID recorded. Awaiting admin approval.',
+      deliveries: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    ordersData.unshift(newOrder);
+    saveData(ORDERS_FILE, ordersData);
+
+    // Sync to Supabase in background
+    pushOrderToSupabase(newOrder).catch(err => console.warn('Supabase sync background error:', err));
+
+    // Auto-sync or register client in users table
+    try {
+      const clientEmailNorm = newOrder.clientEmail.toLowerCase().trim();
+      const existingUserIndex = usersData.findIndex(u => u.email.toLowerCase() === clientEmailNorm);
+      const now = new Date().toISOString();
+      
+      if (existingUserIndex >= 0) {
+        const updatedUser: ServerUser = {
+          ...usersData[existingUserIndex],
+          phone: newOrder.clientPhone || usersData[existingUserIndex].phone,
+          lastLoginAt: now
+        };
+        usersData[existingUserIndex] = updatedUser;
+        saveData(USERS_FILE, usersData);
+        pushUserToSupabase(updatedUser);
+      } else {
+        const newUser: ServerUser = {
+          id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: newOrder.clientName,
+          email: clientEmailNorm,
+          phone: newOrder.clientPhone,
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(newOrder.clientName)}&backgroundColor=0ea5e9,6366f1,10b981`,
+          role: clientEmailNorm === 'beyondpixelsagency.official@gmail.com' ? 'admin' : 'client',
+          createdAt: now,
+          lastLoginAt: now
+        };
+        usersData.unshift(newUser);
+        saveData(USERS_FILE, usersData);
+        pushUserToSupabase(newUser);
+      }
+    } catch (userErr) {
+      console.warn('Auto user register notice on order placement:', userErr);
+    }
+
+    return res.status(201).json({ success: true, order: newOrder });
+  } catch (error: any) {
+    console.error('Unhandled error in POST /api/orders:', error);
+    return res.status(500).json({ error: error.message || 'An unexpected error occurred while saving your order' });
+  }
 });
 
 // ---------------- USER & CLIENT AUTH SYNC ROUTES ----------------

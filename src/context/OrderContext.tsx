@@ -101,7 +101,15 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify(orderData)
       });
 
-      const data = await res.json();
+      const contentType = res.headers.get('content-type') || '';
+      let data: any = {};
+      if (contentType.includes('application/json')) {
+        data = await res.json();
+      } else {
+        const text = await res.text();
+        return { success: false, error: text || 'Server returned a non-JSON response. Please try again.' };
+      }
+
       if (!res.ok) {
         return { success: false, error: data.error || 'Failed to submit order' };
       }

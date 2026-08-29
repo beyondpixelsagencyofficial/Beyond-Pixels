@@ -355,6 +355,19 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
                         <h4 className="text-base font-bold text-white mt-1">
                           {order.packageSelected ? `📦 ${order.packageSelected}` : order.services.join(' + ')}
                         </h4>
+                        {order.subServices && order.subServices.length > 0 && (
+                          <div className="flex flex-wrap gap-1.5 mt-2">
+                            {order.subServices.map((sub, idx) => (
+                              <span
+                                key={idx}
+                                className="px-2 py-0.5 rounded-md bg-neutral-900 border border-neutral-700 text-[11px] text-neutral-300 flex items-center gap-1"
+                              >
+                                <span>{sub.title}</span>
+                                <span className="text-rose-400 font-semibold font-mono">৳{sub.priceBDT.toLocaleString()}</span>
+                              </span>
+                            ))}
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex items-center gap-3">

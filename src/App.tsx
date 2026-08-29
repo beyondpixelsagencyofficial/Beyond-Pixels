@@ -40,10 +40,10 @@ function MainAppContent() {
   // "If logged in with beyondpixelsagency.official@gmail.com, automatically route to the Admin Dashboard.
   // Any other user logging in with Google will automatically be routed to their Client Dashboard/Profile."
   useEffect(() => {
-    if (isAuthenticated && user) {
+    if (isAuthenticated && user && !isOrderModalOpen) {
       setCurrentView('dashboard');
     }
-  }, [isAuthenticated, user?.email]);
+  }, [isAuthenticated, user?.email, isOrderModalOpen]);
 
   const handleOpenOrderModal = (
     service?: ServiceType,

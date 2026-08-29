@@ -81,12 +81,32 @@ export type OrderStatus =
   | 'Completed'
   | 'Rejected';
 
+export interface SubServiceItem {
+  id: string;
+  category: 'Graphic Design' | 'Video Editing' | 'Digital Marketing' | 'Web Development';
+  title: string;
+  titleBn: string;
+  priceBDT: number;
+  description: string;
+  unit?: string;
+  popular?: boolean;
+}
+
+export interface SelectedSubService {
+  id: string;
+  category: string;
+  title: string;
+  priceBDT: number;
+  quantity?: number;
+}
+
 export interface Order {
   id: string;
   clientName: string;
   clientEmail: string;
   clientPhone: string;
   services: ServiceType[];
+  subServices?: SelectedSubService[];
   packageSelected?: string;
   adDollarBudget?: number;
   adBoostBudgetUSD?: number;

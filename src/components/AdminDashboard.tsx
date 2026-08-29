@@ -467,6 +467,15 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                               </span>
                             ))}
                           </div>
+                          {order.subServices && order.subServices.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mb-1.5">
+                              {order.subServices.map((sub, i) => (
+                                <span key={i} className="px-1.5 py-0.5 rounded bg-neutral-900 border border-neutral-700 text-[10px] text-neutral-300">
+                                  {sub.title} (৳{sub.priceBDT.toLocaleString()})
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="font-bold text-white">
                             Total: ৳{totalBDT.toLocaleString()} • <span className="text-emerald-400">30% Adv: ৳{advanceBDT.toLocaleString()}</span>
                           </div>

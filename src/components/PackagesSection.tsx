@@ -289,11 +289,7 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
 
               <button
                 onClick={() => {
-                  if (!isAuthenticated) {
-                    openAuthModal();
-                  } else {
-                    onOpenAdBoostOrder(adDollars, calculatedAdBDT);
-                  }
+                  onOpenAdBoostOrder(adDollars, calculatedAdBDT);
                 }}
                 className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-600/20 cursor-pointer"
               >

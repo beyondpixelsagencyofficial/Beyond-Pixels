@@ -214,40 +214,58 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
                 <thead>
                   <tr className="border-b-2 border-neutral-800 text-neutral-500 uppercase text-[10px] tracking-wider">
                     <th className="py-2.5 font-bold">Item / Project Scope</th>
-                    <th className="py-2.5 font-bold text-center">Delivery Time</th>
+                    <th className="py-2.5 font-bold text-center">Category / Delivery</th>
                     <th className="py-2.5 font-bold text-right">Amount (BDT)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-200">
-                  <tr>
-                    <td className="py-3.5">
-                      <div className="font-bold text-neutral-900 text-sm">
-                        {order.packageSelected 
-                          ? `Package: ${order.packageSelected}` 
-                          : order.services.join(' + ')}
-                      </div>
-                      {order.projectDescription && (
-                        <p className="text-neutral-500 text-[11px] mt-0.5 max-w-md line-clamp-2">
-                          {order.projectDescription}
-                        </p>
-                      )}
-                    </td>
-                    <td className="py-3.5 text-center capitalize text-neutral-700 font-medium">
-                      {order.deliveryTimeframe}
-                    </td>
-                    <td className="py-3.5 text-right font-bold text-neutral-900 text-sm">
-                      ৳{order.estimatedTotalBDT.toLocaleString()}
-                    </td>
-                  </tr>
+                  {order.subServices && order.subServices.length > 0 ? (
+                    order.subServices.map((sub, idx) => (
+                      <tr key={idx}>
+                        <td className="py-2.5">
+                          <div className="font-bold text-neutral-900 text-xs">
+                            {sub.title}
+                          </div>
+                        </td>
+                        <td className="py-2.5 text-center text-neutral-600 font-medium text-[11px]">
+                          {sub.category}
+                        </td>
+                        <td className="py-2.5 text-right font-semibold text-neutral-900 text-xs">
+                          ৳{sub.priceBDT.toLocaleString()}
+                        </td>
+                      </tr>
+                    ))
+                  ) : (
+                    <tr>
+                      <td className="py-3.5">
+                        <div className="font-bold text-neutral-900 text-sm">
+                          {order.packageSelected 
+                            ? `Package: ${order.packageSelected}` 
+                            : order.services.join(' + ')}
+                        </div>
+                        {order.projectDescription && (
+                          <p className="text-neutral-500 text-[11px] mt-0.5 max-w-md line-clamp-2">
+                            {order.projectDescription}
+                          </p>
+                        )}
+                      </td>
+                      <td className="py-3.5 text-center capitalize text-neutral-700 font-medium">
+                        {order.deliveryTimeframe}
+                      </td>
+                      <td className="py-3.5 text-right font-bold text-neutral-900 text-sm">
+                        ৳{order.estimatedTotalBDT.toLocaleString()}
+                      </td>
+                    </tr>
+                  )}
 
                   {order.adBoostBudgetUSD && order.adBoostBudgetUSD > 0 && (
                     <tr>
-                      <td className="py-3 text-neutral-700">
+                      <td className="py-2.5 text-neutral-700">
                         <span className="font-bold">Meta / Google Ad Dollar Top-up</span> (${order.adBoostBudgetUSD} USD @ ৳148/$)
                       </td>
-                      <td className="py-3 text-center text-neutral-500">Same Day</td>
-                      <td className="py-3 text-right font-semibold text-neutral-800">
-                        Included in Total
+                      <td className="py-2.5 text-center text-neutral-500 text-[11px]">Same Day Top-up</td>
+                      <td className="py-2.5 text-right font-semibold text-neutral-800">
+                        ৳{(order.adBoostBudgetUSD * (order.adDollarRateBDT || 148)).toLocaleString()}
                       </td>
                     </tr>
                   )}
