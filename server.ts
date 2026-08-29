@@ -564,15 +564,68 @@ app.put('/api/cms', async (req: Request, res: Response) => {
 });
 
 // GET Orders (Admin gets all; Client gets their own by email)
-app.get('/api/orders', (req: Request, res: Response) => {
-  const userEmail = (req.headers['x-user-email'] as string || '').toLowerCase();
+app.get('/api/orders', async (req: Request, res: Response) => {
+  const userEmail = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
   
+  // Real-time sync with Supabase so admin and users always have the latest orders
+  try {
+    const { data: remoteOrders, error: ordersErr } = await supabase
+      .from('orders')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!ordersErr && remoteOrders && remoteOrders.length > 0) {
+      const mappedOrders = remoteOrders
+        .map((row: any) => {
+          if (row.data && typeof row.data === 'object') {
+            return { ...row.data, id: row.id || row.data.id };
+          }
+          return {
+            id: row.id,
+            clientName: row.client_name || row.clientName,
+            clientEmail: row.client_email || row.clientEmail,
+            clientPhone: row.client_phone || row.clientPhone,
+            services: row.services || [],
+            subServices: row.sub_services || row.subServices || [],
+            packageSelected: row.package_selected || row.packageSelected,
+            adDollarBudget: row.ad_dollar_budget || row.adDollarBudget,
+            deliveryTimeframe: row.delivery_timeframe || row.deliveryTimeframe || 'standard',
+            projectDescription: row.project_description || row.projectDescription || '',
+            briefFiles: row.brief_files || row.briefFiles || [],
+            estimatedTotalBDT: row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0,
+            advanceAmountBDT: row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0,
+            paymentMethod: row.payment_method || row.paymentMethod || 'bKash',
+            paymentNumber: row.payment_number || row.paymentNumber || '01965407715',
+            transactionId: row.transaction_id || row.transactionId || '',
+            status: row.status || 'Pending Verification',
+            adminNotes: row.admin_notes || row.adminNotes || '',
+            deliveries: row.deliveries || [],
+            createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+            updatedAt: row.updated_at || row.updatedAt || new Date().toISOString()
+          };
+        })
+        .filter((o: any) => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
+
+      const map = new Map();
+      mappedOrders.forEach((o: any) => map.set(o.id, o));
+      ordersData.forEach((o: any) => {
+        if (!map.has(o.id)) map.set(o.id, o);
+      });
+      ordersData = Array.from(map.values()).sort((a: any, b: any) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
+      saveData(ORDERS_FILE, ordersData);
+    }
+  } catch (syncErr) {
+    console.warn('Orders on-demand sync notice:', syncErr);
+  }
+
   if (userEmail === 'beyondpixelsagency.official@gmail.com') {
     return res.json(ordersData);
   }
 
   if (userEmail) {
-    const userOrders = ordersData.filter(o => o.clientEmail.toLowerCase() === userEmail);
+    const userOrders = ordersData.filter(o => o.clientEmail && o.clientEmail.toLowerCase().trim() === userEmail);
     return res.json(userOrders);
   }
 

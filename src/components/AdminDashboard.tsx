@@ -170,24 +170,55 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
     );
   };
 
+  const [isManualRefreshing, setIsManualRefreshing] = useState(false);
+
+  const handleManualRefresh = async () => {
+    setIsManualRefreshing(true);
+    try {
+      await Promise.all([refreshOrders(), refreshCMS(), loadUsers()]);
+    } catch (e) {
+      console.warn('Refresh error:', e);
+    } finally {
+      setTimeout(() => setIsManualRefreshing(false), 500);
+    }
+  };
+
   const filteredOrders = orders.filter(o => {
+    if (!o) return false;
     const matchesFilter = orderStatusFilter === 'all' || o.status === orderStatusFilter;
-    const query = orderSearch.toLowerCase();
+    const query = (orderSearch || '').toLowerCase().trim();
+    if (!query) return matchesFilter;
+
+    const id = (o.id || '').toLowerCase();
+    const name = (o.clientName || '').toLowerCase();
+    const email = (o.clientEmail || '').toLowerCase();
+    const phone = (o.clientPhone || '').toLowerCase();
+    const trx = (o.transactionId || '').toLowerCase();
+    const pkg = (o.packageSelected || '').toLowerCase();
+    const services = Array.isArray(o.services) ? o.services.join(' ').toLowerCase() : '';
+    const subServices = Array.isArray(o.subServices) ? o.subServices.map(s => s?.title || '').join(' ').toLowerCase() : '';
+
     const matchesSearch = 
-      o.id.toLowerCase().includes(query) ||
-      o.clientName.toLowerCase().includes(query) ||
-      o.clientEmail.toLowerCase().includes(query) ||
-      o.transactionId.toLowerCase().includes(query) ||
-      (o.packageSelected && o.packageSelected.toLowerCase().includes(query)) ||
-      o.services.some(s => s.toLowerCase().includes(query));
+      id.includes(query) ||
+      name.includes(query) ||
+      email.includes(query) ||
+      phone.includes(query) ||
+      trx.includes(query) ||
+      pkg.includes(query) ||
+      services.includes(query) ||
+      subServices.includes(query);
+
     return matchesFilter && matchesSearch;
   });
 
   // Calculate live financial stats in BDT
-  const totalPipelineBDT = orders.reduce((sum, o) => sum + (o.estimatedTotalBDT || (o as any).estimatedTotal || 0), 0);
+  const totalPipelineBDT = orders.reduce((sum, o) => sum + (Number(o.estimatedTotalBDT) || Number((o as any).estimatedTotal) || 0), 0);
   const totalAdvanceCollectedBDT = orders
     .filter(o => o.status !== 'Rejected' && o.status !== 'Pending Verification')
-    .reduce((sum, o) => sum + (o.advanceAmountBDT || (o as any).advanceAmount || 0), 0);
+    .reduce((sum, o) => sum + (Number(o.advanceAmountBDT) || Number((o as any).advanceAmount) || 0), 0);
+  
+  const pendingVerificationCount = orders.filter(o => o.status === 'Pending Verification').length;
+  const inProgressCount = orders.filter(o => o.status === 'In Progress').length;
 
   return (
     <div className="min-h-screen bg-[#080808] text-white py-8 px-4 sm:px-6 lg:px-8">
@@ -220,11 +251,14 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
               ← View Live Site
             </button>
             <button
-              onClick={() => { refreshOrders(); refreshCMS(); }}
-              className="p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-colors cursor-pointer"
-              title="Refresh Data"
+              onClick={handleManualRefresh}
+              className={`p-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 transition-all cursor-pointer flex items-center gap-1.5 ${
+                isManualRefreshing ? 'opacity-70 pointer-events-none' : ''
+              }`}
+              title="Refresh All Real-time Data"
             >
-              <RefreshCw className="w-4 h-4" />
+              <RefreshCw className={`w-4 h-4 ${isManualRefreshing ? 'animate-spin text-rose-500' : ''}`} />
+              <span className="text-[11px] font-semibold pr-1">Sync</span>
             </button>
           </div>
         </div>
@@ -237,7 +271,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
               <span className="text-rose-500 font-bold">৳</span>
             </div>
             <div className="text-2xl font-black text-white">৳{totalPipelineBDT.toLocaleString()}</div>
-            <div className="text-[11px] text-neutral-500">Total gross value across all orders</div>
+            <div className="text-[11px] text-neutral-500">Total gross value across all orders ({orders.length})</div>
           </div>
 
           <div className="p-5 rounded-2xl bg-[#0D0D0D] border border-neutral-800 space-y-1">
@@ -254,7 +288,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
               <span>Pending Advance TrxIDs</span>
               <Clock className="w-4 h-4 text-amber-400" />
             </div>
-            <div className="text-2xl font-black text-amber-400">{stats?.pendingOrders || 0}</div>
+            <div className="text-2xl font-black text-amber-400">{pendingVerificationCount}</div>
             <div className="text-[11px] text-neutral-500">Awaiting SMS statement confirmation</div>
           </div>
 
@@ -263,7 +297,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
               <span>Active Production</span>
               <Package className="w-4 h-4 text-blue-400" />
             </div>
-            <div className="text-2xl font-black text-blue-400">{stats?.inProgressOrders || 0}</div>
+            <div className="text-2xl font-black text-blue-400">{inProgressCount}</div>
             <div className="text-[11px] text-neutral-500">Live projects in design & video</div>
           </div>
         </div>

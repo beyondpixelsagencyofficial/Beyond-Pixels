@@ -86,9 +86,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
     setIsLoadingOrders(true);
-    let loadedOrders: Order[] = [];
+    const orderMap = new Map<string, Order>();
 
-    // 1. Try Express API
+    // 1. Fetch from Express API
     try {
       const res = await fetch('/api/orders', {
         headers: {
@@ -99,34 +99,51 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (res.ok && contentType.includes('application/json')) {
         const data = await res.json();
         if (Array.isArray(data)) {
-          loadedOrders = data;
+          data.forEach((o: Order) => {
+            if (o && o.id && o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com') {
+              orderMap.set(o.id, o);
+            }
+          });
         }
       }
     } catch (err) {
       console.warn('API fetch orders notice:', err);
     }
 
-    // 2. Direct Supabase Fallback if API returned empty or failed
-    if (loadedOrders.length === 0) {
-      try {
-        let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
-        if (!isAdmin) {
-          query = query.ilike('client_email', user.email.trim());
-        }
-        const { data: sbOrders, error: sbErr } = await query;
-        if (!sbErr && sbOrders && sbOrders.length > 0) {
-          loadedOrders = sbOrders
-            .map(mapSupabaseOrderRow)
-            .filter(o => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
-        }
-      } catch (sbErr) {
-        console.warn('Supabase direct orders fetch notice:', sbErr);
+    // 2. Fetch from Supabase Direct to guarantee no orders are missed
+    try {
+      let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
+      if (!isAdmin) {
+        query = query.ilike('client_email', user.email.trim());
       }
+      const { data: sbOrders, error: sbErr } = await query;
+      if (!sbErr && sbOrders && sbOrders.length > 0) {
+        sbOrders
+          .map(mapSupabaseOrderRow)
+          .filter(o => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com')
+          .forEach((o: Order) => {
+            // If already present from API, merge or keep latest
+            if (!orderMap.has(o.id)) {
+              orderMap.set(o.id, o);
+            } else {
+              const existing = orderMap.get(o.id)!;
+              const remoteUpdated = new Date(o.updatedAt || o.createdAt || 0).getTime();
+              const existingUpdated = new Date(existing.updatedAt || existing.createdAt || 0).getTime();
+              if (remoteUpdated >= existingUpdated) {
+                orderMap.set(o.id, { ...existing, ...o });
+              }
+            }
+          });
+      }
+    } catch (sbErr) {
+      console.warn('Supabase direct orders fetch notice:', sbErr);
     }
 
-    if (loadedOrders.length > 0) {
-      setOrders(loadedOrders);
-    }
+    const mergedList = Array.from(orderMap.values()).sort((a, b) => 
+      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+    );
+
+    setOrders(mergedList);
     setIsLoadingOrders(false);
   }, [isAuthenticated, user, isAdmin]);
 
@@ -162,13 +179,39 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isAdmin, user]);
 
+  // Initial load and live polling interval
   useEffect(() => {
     fetchOrders();
     if (isAdmin) {
       fetchStats();
       fetchMessages();
     }
-  }, [fetchOrders, fetchStats, fetchMessages, isAdmin]);
+
+    // Auto-poll orders every 8 seconds for live dashboard updates
+    const pollInterval = setInterval(() => {
+      if (isAuthenticated && user) {
+        fetchOrders();
+        if (isAdmin) {
+          fetchStats();
+          fetchMessages();
+        }
+      }
+    }, 8000);
+
+    // Supabase Realtime table listener
+    const channel = supabase
+      .channel('realtime_orders_subscription')
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'orders' }, () => {
+        fetchOrders();
+        if (isAdmin) fetchStats();
+      })
+      .subscribe();
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(channel);
+    };
+  }, [fetchOrders, fetchStats, fetchMessages, isAdmin, isAuthenticated, user]);
 
   const createOrder = async (orderData: Partial<Order>): Promise<{ success: boolean; order?: Order; error?: string }> => {
     const finalTotalBDT = Number(orderData.estimatedTotalBDT) || 3500;
