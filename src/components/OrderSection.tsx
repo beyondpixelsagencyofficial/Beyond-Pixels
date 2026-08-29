@@ -43,20 +43,29 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
   onOrderSuccess,
   isModal = false 
 }) => {
-  const { user, isAuthenticated, loginWithGoogle } = useAuth();
+  const { user, isAuthenticated, loginWithGoogle, openAuthModal } = useAuth();
   const { cms } = useCMS();
   const { createOrder } = useOrders();
 
-  // Form State - Keep blank by default so every client enters their own info
-  const [clientName, setClientName] = useState('');
-  const [clientEmail, setClientEmail] = useState('');
-  const [clientPhone, setClientPhone] = useState('');
+  // Form State - Auto-populate from logged-in user profile
+  const [clientName, setClientName] = useState(user?.name || '');
+  const [clientEmail, setClientEmail] = useState(user?.email || '');
+  const [clientPhone, setClientPhone] = useState(user?.phone || '');
   const [selectedServices, setSelectedServices] = useState<ServiceType[]>([]);
   const [selectedPackage, setSelectedPackage] = useState<string | undefined>(undefined);
   const [adBoostBudgetUSD, setAdBoostBudgetUSD] = useState<number | undefined>(undefined);
   const [deliveryTimeframe, setDeliveryTimeframe] = useState<DeliveryTimeframe>('standard');
   const [projectDescription, setProjectDescription] = useState('');
   const [briefFiles, setBriefFiles] = useState<FileAttachment[]>([]);
+
+  // Update client info when auth state changes
+  useEffect(() => {
+    if (user) {
+      if (user.name) setClientName(user.name);
+      if (user.email) setClientEmail(user.email);
+      if (user.phone) setClientPhone(user.phone);
+    }
+  }, [user]);
   
   // Payment State
   const [paymentMethod, setPaymentMethod] = useState<'bKash' | 'Nagad'>('bKash');
@@ -172,6 +181,12 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
   const handleSubmitOrder = async (e: React.FormEvent) => {
     e.preventDefault();
     setSubmissionError(null);
+
+    if (!isAuthenticated) {
+      setSubmissionError('Please sign in or create an account with Google to place and track your order.');
+      openAuthModal();
+      return;
+    }
 
     if (!clientName.trim()) {
       setSubmissionError('Please enter your full name');
@@ -347,6 +362,30 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
               {/* Form Content */}
               <div className="p-6 sm:p-8 md:p-10 space-y-8">
                 
+                {/* Auth Gate Notification Banner if Not Logged In */}
+                {!isAuthenticated && (
+                  <div className="p-4 sm:p-5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-rose-500/20 text-rose-400 flex items-center justify-center shrink-0">
+                        <ShieldAlert className="w-5 h-5" />
+                      </div>
+                      <div>
+                        <h4 className="text-xs sm:text-sm font-bold text-white">Client Account Required to Place Order</h4>
+                        <p className="text-[11px] sm:text-xs text-neutral-300 mt-0.5">
+                          Please log in with Google to secure your order and access real-time file deliveries.
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={openAuthModal}
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider shrink-0 cursor-pointer shadow-md shadow-rose-600/30 transition-all w-full sm:w-auto text-center"
+                    >
+                      Sign In with Google
+                    </button>
+                  </div>
+                )}
+
                 {/* 1. Client Details Section */}
                 <div className="space-y-4">
                   <div className="flex items-center justify-between">
@@ -753,11 +792,16 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
                 <div className="pt-2">
                   <button
                     type="submit"
-                    disabled={isSubmitting || (selectedServices.length === 0 && !selectedPackage)}
+                    disabled={isSubmitting || (isAuthenticated && selectedServices.length === 0 && !selectedPackage)}
                     className="w-full py-4 rounded-2xl bg-rose-600 hover:bg-rose-500 disabled:opacity-50 text-white font-black text-xs uppercase tracking-wider shadow-xl shadow-rose-600/30 transition-all flex items-center justify-center gap-2 cursor-pointer"
                   >
                     {isSubmitting ? (
                       <span>Verifying & Submitting Order...</span>
+                    ) : !isAuthenticated ? (
+                      <>
+                        <ShieldAlert className="w-4 h-4 text-amber-300" />
+                        <span>Sign In with Google to Complete Order (৳{advanceAmountBDT.toLocaleString()})</span>
+                      </>
                     ) : (
                       <>
                         <span>Submit Order & Verify 30% Advance (৳{advanceAmountBDT.toLocaleString()})</span>

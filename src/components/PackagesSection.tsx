@@ -11,8 +11,10 @@ import {
   ShieldCheck, 
   Flame, 
   Share2, 
-  DollarSign 
+  DollarSign,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useCMS } from '../context/CMSContext';
 import { AgencyPackage, ServiceType } from '../types';
 
@@ -25,6 +27,7 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
   onSelectPackage, 
   onOpenAdBoostOrder 
 }) => {
+  const { isAuthenticated, openAuthModal } = useAuth();
   const { cms } = useCMS();
   const [adDollars, setAdDollars] = useState(50);
   const adRate = cms?.adDollarRateBDT || 148; // 145-150 BDT per dollar
@@ -168,7 +171,13 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
               {/* Order Button */}
               <div className="pt-8 mt-6 border-t border-neutral-800/80">
                 <button
-                  onClick={() => onSelectPackage(pkg)}
+                  onClick={() => {
+                    if (!isAuthenticated) {
+                      openAuthModal();
+                    } else {
+                      onSelectPackage(pkg);
+                    }
+                  }}
                   className={`w-full py-3.5 px-6 rounded-2xl font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all cursor-pointer ${
                     pkg.popularBadge
                       ? 'bg-rose-600 hover:bg-rose-500 text-white shadow-lg shadow-rose-600/30'
@@ -279,7 +288,13 @@ export const PackagesSection: React.FC<PackagesSectionProps> = ({
               </div>
 
               <button
-                onClick={() => onOpenAdBoostOrder(adDollars, calculatedAdBDT)}
+                onClick={() => {
+                  if (!isAuthenticated) {
+                    openAuthModal();
+                  } else {
+                    onOpenAdBoostOrder(adDollars, calculatedAdBDT);
+                  }
+                }}
                 className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center justify-center gap-2 transition-all shadow-lg shadow-rose-600/20 cursor-pointer"
               >
                 <span>Launch ${adDollars} Ad Campaign</span>

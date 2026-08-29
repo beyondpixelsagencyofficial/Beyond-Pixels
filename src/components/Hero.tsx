@@ -14,6 +14,7 @@ import {
   PackageCheck,
   Search
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useCMS } from '../context/CMSContext';
 
 interface HeroProps {
@@ -29,6 +30,7 @@ export const Hero: React.FC<HeroProps> = ({
   onExplorePackages,
   onOpenTrackerModal
 }) => {
+  const { isAuthenticated, openAuthModal } = useAuth();
   const { cms } = useCMS();
 
   return (
@@ -84,7 +86,13 @@ export const Hero: React.FC<HeroProps> = ({
             {/* Primary Order CTA */}
             <button
               id="hero-primary-cta"
-              onClick={onOpenOrderModal}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  openAuthModal();
+                } else {
+                  onOpenOrderModal();
+                }
+              }}
               className="w-full sm:w-auto px-8 py-4 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-black text-xs uppercase tracking-wider transition-all duration-300 shadow-xl shadow-rose-600/30 hover:-translate-y-0.5 flex items-center justify-center gap-2 group cursor-pointer"
             >
               <span>{cms?.ctaPrimaryText || "Place Order / Get Started"}</span>
@@ -103,7 +111,13 @@ export const Hero: React.FC<HeroProps> = ({
 
             {/* Track Order Shortcut */}
             <button
-              onClick={onOpenTrackerModal}
+              onClick={() => {
+                if (!isAuthenticated) {
+                  openAuthModal();
+                } else {
+                  onOpenTrackerModal();
+                }
+              }}
               className="w-full sm:w-auto px-6 py-4 rounded-2xl bg-transparent hover:bg-neutral-900 text-neutral-300 border border-neutral-800/80 font-bold text-xs uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2 cursor-pointer"
             >
               <Search className="w-3.5 h-3.5 text-blue-400" />

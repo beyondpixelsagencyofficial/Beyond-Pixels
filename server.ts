@@ -189,38 +189,8 @@ const DEFAULT_CMS = {
   ]
 };
 
-// Initial Seed Orders for Realistic Experience
-const INITIAL_ORDERS = [
-  {
-    id: "BP-9281",
-    clientName: "Tahmid Rahman",
-    clientEmail: "tahmid.creative@gmail.com",
-    clientPhone: "+8801712345678",
-    services: ["Graphic Design", "Video Editing"],
-    deliveryTimeframe: "express",
-    projectDescription: "Need a comprehensive branding kit and 5 high-converting Instagram reels for our new apparel brand launch.",
-    briefFiles: [],
-    estimatedTotalBDT: 12000,
-    advanceAmountBDT: 3600,
-    paymentMethod: "bKash",
-    paymentNumber: "01965407715",
-    transactionId: "BK9X872610A",
-    status: "In Progress",
-    adminNotes: "Advance payment verified on bKash. Designer assigned. First draft reels scheduled for tomorrow 4 PM.",
-    deliveries: [
-      {
-        id: "del_1",
-        title: "Initial Logo Concepts & Color Palette (Figma Preview)",
-        notes: "Please review the 3 logo variations and choose the favorite font weights.",
-        linkOrData: "https://www.figma.com/file/demo-beyond-pixels-preview",
-        type: "link",
-        addedAt: new Date(Date.now() - 86400000).toISOString()
-      }
-    ],
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    updatedAt: new Date(Date.now() - 86400000).toISOString()
-  }
-];
+// Initial Seed Orders (Clean Slate - starts with 0 orders)
+const INITIAL_ORDERS: any[] = [];
 
 // Data Directory and File Paths for persistence
 const DATA_DIR = path.join(__dirname, 'data');
@@ -342,34 +312,36 @@ async function syncFromSupabase() {
       .order('created_at', { ascending: false });
 
     if (!ordersErr && remoteOrders && remoteOrders.length > 0) {
-      // Map remote rows to Order objects (support both camelCase/snake_case and json 'data' column)
-      const mappedOrders = remoteOrders.map((row: any) => {
-        if (row.data && typeof row.data === 'object') {
-          return { ...row.data, id: row.id || row.data.id };
-        }
-        return {
-          id: row.id,
-          clientName: row.client_name || row.clientName,
-          clientEmail: row.client_email || row.clientEmail,
-          clientPhone: row.client_phone || row.clientPhone,
-          services: row.services || [],
-          packageSelected: row.package_selected || row.packageSelected,
-          adDollarBudget: row.ad_dollar_budget || row.adDollarBudget,
-          deliveryTimeframe: row.delivery_timeframe || row.deliveryTimeframe || 'standard',
-          projectDescription: row.project_description || row.projectDescription || '',
-          briefFiles: row.brief_files || row.briefFiles || [],
-          estimatedTotalBDT: row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0,
-          advanceAmountBDT: row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0,
-          paymentMethod: row.payment_method || row.paymentMethod || 'bKash',
-          paymentNumber: row.payment_number || row.paymentNumber || '01965407715',
-          transactionId: row.transaction_id || row.transactionId || '',
-          status: row.status || 'Pending Verification',
-          adminNotes: row.admin_notes || row.adminNotes || '',
-          deliveries: row.deliveries || [],
-          createdAt: row.created_at || row.createdAt || new Date().toISOString(),
-          updatedAt: row.updated_at || row.updatedAt || new Date().toISOString()
-        };
-      });
+      // Filter out any previous dummy seed orders (BP-9281 / tahmid.creative@gmail.com)
+      const mappedOrders = remoteOrders
+        .map((row: any) => {
+          if (row.data && typeof row.data === 'object') {
+            return { ...row.data, id: row.id || row.data.id };
+          }
+          return {
+            id: row.id,
+            clientName: row.client_name || row.clientName,
+            clientEmail: row.client_email || row.clientEmail,
+            clientPhone: row.client_phone || row.clientPhone,
+            services: row.services || [],
+            packageSelected: row.package_selected || row.packageSelected,
+            adDollarBudget: row.ad_dollar_budget || row.adDollarBudget,
+            deliveryTimeframe: row.delivery_timeframe || row.deliveryTimeframe || 'standard',
+            projectDescription: row.project_description || row.projectDescription || '',
+            briefFiles: row.brief_files || row.briefFiles || [],
+            estimatedTotalBDT: row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0,
+            advanceAmountBDT: row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0,
+            paymentMethod: row.payment_method || row.paymentMethod || 'bKash',
+            paymentNumber: row.payment_number || row.paymentNumber || '01965407715',
+            transactionId: row.transaction_id || row.transactionId || '',
+            status: row.status || 'Pending Verification',
+            adminNotes: row.admin_notes || row.adminNotes || '',
+            deliveries: row.deliveries || [],
+            createdAt: row.created_at || row.createdAt || new Date().toISOString(),
+            updatedAt: row.updated_at || row.updatedAt || new Date().toISOString()
+          };
+        })
+        .filter(o => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
 
       ordersData = mappedOrders;
       saveData(ORDERS_FILE, ordersData);

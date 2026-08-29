@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   X, 
@@ -14,8 +14,10 @@ import {
   Phone,
   Calendar,
   Layers,
-  Receipt
+  Receipt,
+  LogIn
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { Order, OrderStatus } from '../types';
 import { InvoiceModal } from './InvoiceModal';
 
@@ -25,11 +27,28 @@ interface OrderTrackerModalProps {
 }
 
 export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({ isOpen, onClose }) => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
+
+  // Auto-fetch current user's orders if authenticated and search is empty
+  useEffect(() => {
+    if (isOpen && isAuthenticated && user?.email) {
+      setIsLoading(true);
+      fetch(`/api/orders/track?query=${encodeURIComponent(user.email)}`)
+        .then(res => res.json())
+        .then(data => {
+          if (data.results && data.results.length > 0) {
+            setOrders(data.results);
+          }
+        })
+        .catch(err => console.warn('Auto fetch user orders error:', err))
+        .finally(() => setIsLoading(false));
+    }
+  }, [isOpen, isAuthenticated, user]);
 
   if (!isOpen) return null;
 
@@ -114,39 +133,65 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({ isOpen, on
               Track Your Production Order
             </h2>
             <p className="text-xs text-neutral-400 mt-1">
-              Enter your Order Code (e.g. <span className="text-rose-400 font-mono font-semibold">BP-9281</span>), bKash/Nagad Transaction ID, or Phone Number.
+              Enter your Order Code (e.g. <span className="text-rose-400 font-mono font-semibold">BP-1001</span>), bKash/Nagad Transaction ID, or Phone Number.
             </p>
           </div>
 
-          {/* Search Form */}
-          <form onSubmit={handleSearch} className="mb-6">
-            <div className="flex gap-2">
-              <div className="relative flex-1">
-                <input
-                  type="text"
-                  required
-                  placeholder="Enter Order Code (BP-XXXX) or TrxID..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full px-4 py-3 rounded-2xl bg-[#141414] border border-neutral-800 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
-                />
+          {!isAuthenticated ? (
+            <div className="p-6 sm:p-8 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-center space-y-4 my-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 mx-auto flex items-center justify-center">
+                <ShieldCheck className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-sm font-bold text-white">Client Sign In Required</h3>
+                <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
+                  To protect your project files, private briefs, and invoice records, please sign in with your verified Google account.
+                </p>
               </div>
               <button
-                type="submit"
-                disabled={isLoading || !searchQuery.trim()}
-                className="px-5 sm:px-6 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50 cursor-pointer"
+                onClick={() => {
+                  onClose();
+                  openAuthModal();
+                }}
+                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-rose-600/20"
               >
-                {isLoading ? (
-                  <span>Searching...</span>
-                ) : (
-                  <>
-                    <Search className="w-4 h-4" />
-                    <span>Track</span>
-                  </>
-                )}
+                <LogIn className="w-4 h-4" />
+                <span>Sign In with Google</span>
               </button>
             </div>
-          </form>
+          ) : (
+            <>
+              {/* Search Form */}
+              <form onSubmit={handleSearch} className="mb-6">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <input
+                      type="text"
+                      required
+                      placeholder="Enter Order Code (BP-XXXX) or TrxID..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="w-full px-4 py-3 rounded-2xl bg-[#141414] border border-neutral-800 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={isLoading || !searchQuery.trim()}
+                    className="px-5 sm:px-6 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50 cursor-pointer"
+                  >
+                    {isLoading ? (
+                      <span>Searching...</span>
+                    ) : (
+                      <>
+                        <Search className="w-4 h-4" />
+                        <span>Track</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
 
           {/* Error */}
           {error && (

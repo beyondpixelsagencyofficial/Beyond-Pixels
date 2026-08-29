@@ -11,8 +11,10 @@ import {
   Clock, 
   FileCheck,
   ChevronRight,
-  ShieldCheck
+  ShieldCheck,
+  Lock
 } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 import { useCMS } from '../context/CMSContext';
 import { ServiceItem, ServiceType } from '../types';
 
@@ -21,6 +23,7 @@ interface ServicesSectionProps {
 }
 
 export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectServiceToOrder }) => {
+  const { isAuthenticated, openAuthModal } = useAuth();
   const { cms } = useCMS();
   const [selectedServiceDetail, setSelectedServiceDetail] = useState<ServiceItem | null>(null);
 
@@ -127,7 +130,13 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectServic
                     </button>
                     <button
                       id={`order-service-${service.key.replace(/\s+/g, '-').toLowerCase()}`}
-                      onClick={() => onSelectServiceToOrder(service.key)}
+                      onClick={() => {
+                        if (!isAuthenticated) {
+                          openAuthModal();
+                        } else {
+                          onSelectServiceToOrder(service.key);
+                        }
+                      }}
                       className="py-2.5 px-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-[11px] uppercase tracking-wider transition-all flex items-center justify-center gap-1 shadow-md shadow-rose-600/20 cursor-pointer"
                     >
                       <span>Order</span>
@@ -217,7 +226,11 @@ export const ServicesSection: React.FC<ServicesSectionProps> = ({ onSelectServic
                   onClick={() => {
                     const svc = selectedServiceDetail.key;
                     setSelectedServiceDetail(null);
-                    onSelectServiceToOrder(svc);
+                    if (!isAuthenticated) {
+                      openAuthModal();
+                    } else {
+                      onSelectServiceToOrder(svc);
+                    }
                   }}
                   className="flex-2 py-3 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider transition-colors flex items-center justify-center gap-1.5 cursor-pointer shadow-lg shadow-rose-600/20"
                 >

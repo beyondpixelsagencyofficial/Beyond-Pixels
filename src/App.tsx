@@ -122,7 +122,7 @@ function MainAppContent() {
 
             <PackagesSection
               onSelectPackage={(pkg) => handleOpenOrderModal(undefined, pkg)}
-              onSelectAdBoost={(dollars, totalBDT) => handleOpenOrderModal(undefined, undefined, { dollars, totalBDT })}
+              onOpenAdBoostOrder={(dollars, totalBDT) => handleOpenOrderModal(undefined, undefined, { dollars, totalBDT })}
             />
 
             <WhyChooseUs />

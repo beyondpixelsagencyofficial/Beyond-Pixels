@@ -139,7 +139,13 @@ export const Header: React.FC<HeaderProps> = ({
           {/* Order Tracker Button */}
           <button
             id="header-track-order-btn"
-            onClick={onOpenTrackerModal}
+            onClick={() => {
+              if (!isAuthenticated) {
+                openAuthModal();
+              } else {
+                onOpenTrackerModal();
+              }
+            }}
             className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold border border-neutral-300 dark:border-neutral-800 hover:border-rose-500/50 text-neutral-700 dark:text-neutral-300 hover:text-rose-500 dark:hover:text-rose-400 transition-all cursor-pointer"
             title="Track Order Status"
           >
@@ -161,8 +167,12 @@ export const Header: React.FC<HeaderProps> = ({
           <button
             id="header-place-order-cta"
             onClick={() => {
-              if (currentView !== 'landing') setCurrentView('landing');
-              onOpenOrderModal();
+              if (!isAuthenticated) {
+                openAuthModal();
+              } else {
+                if (currentView !== 'landing') setCurrentView('landing');
+                onOpenOrderModal();
+              }
             }}
             className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider bg-rose-600 hover:bg-rose-500 text-white transition-all shadow-md shadow-rose-600/20 flex items-center gap-1.5 cursor-pointer"
           >
@@ -309,7 +319,13 @@ export const Header: React.FC<HeaderProps> = ({
         {/* Mobile menu button */}
         <div className="flex md:hidden items-center gap-2">
           <button
-            onClick={onOpenTrackerModal}
+            onClick={() => {
+              if (!isAuthenticated) {
+                openAuthModal();
+              } else {
+                onOpenTrackerModal();
+              }
+            }}
             className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-rose-500"
             title="Track Order"
           >
@@ -380,10 +396,14 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  if (currentView !== 'landing') setCurrentView('landing');
-                  onOpenOrderModal();
+                  if (!isAuthenticated) {
+                    openAuthModal();
+                  } else {
+                    if (currentView !== 'landing') setCurrentView('landing');
+                    onOpenOrderModal();
+                  }
                 }}
-                className="w-full py-3 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider text-center"
+                className="w-full py-3 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider text-center cursor-pointer shadow-lg shadow-rose-600/20"
               >
                 Place Order / Get Started
               </button>
@@ -391,9 +411,13 @@ export const Header: React.FC<HeaderProps> = ({
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  onOpenTrackerModal();
+                  if (!isAuthenticated) {
+                    openAuthModal();
+                  } else {
+                    onOpenTrackerModal();
+                  }
                 }}
-                className="w-full py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-xs flex items-center justify-center gap-2"
+                className="w-full py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
               >
                 <Search className="w-3.5 h-3.5 text-rose-500" />
                 <span>Track Existing Order</span>
