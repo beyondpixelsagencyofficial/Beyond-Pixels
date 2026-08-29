@@ -45,6 +45,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
     orders, 
     stats, 
     messages, 
+    createOrder,
+    seedDemoOrder,
     updateOrderStatus, 
     addDelivery, 
     deleteOrder, 
@@ -247,6 +249,18 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
 
           <div className="flex flex-wrap items-center gap-3">
             <button
+              onClick={async () => {
+                const res = await seedDemoOrder();
+                if (res.success) {
+                  alert(`Test Order (${res.order?.id}) created successfully!`);
+                }
+              }}
+              className="px-3.5 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition-colors cursor-pointer flex items-center gap-2"
+              title="Create a live test client order to test invoice, approval & delivery flow"
+            >
+              <span>+ Create Test Order</span>
+            </button>
+            <button
               onClick={onBackToLanding}
               className="px-4 py-2.5 rounded-xl border border-neutral-700 text-xs font-bold hover:bg-neutral-800 transition-colors cursor-pointer"
             >
@@ -391,8 +405,21 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
 
             {/* Orders Cards / Table */}
             {filteredOrders.length === 0 ? (
-              <div className="p-12 text-center rounded-3xl bg-[#0D0D0D] border border-neutral-800 text-neutral-400 text-xs">
-                No orders match your filter.
+              <div className="p-12 text-center rounded-3xl bg-[#0D0D0D] border border-neutral-800 text-neutral-400 text-xs space-y-4">
+                <p>No orders found matching this filter.</p>
+                <div>
+                  <button
+                    onClick={async () => {
+                      const res = await seedDemoOrder();
+                      if (res.success) {
+                        alert(`Demo order (${res.order?.id}) created!`);
+                      }
+                    }}
+                    className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-rose-600/20"
+                  >
+                    <span>+ Create Demo Order</span>
+                  </button>
+                </div>
               </div>
             ) : (
               <div className="space-y-4">

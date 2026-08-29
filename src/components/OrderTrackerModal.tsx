@@ -137,60 +137,52 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({ isOpen, on
             </p>
           </div>
 
-          {!isAuthenticated ? (
-            <div className="p-6 sm:p-8 rounded-2xl bg-neutral-900/80 border border-neutral-800 text-center space-y-4 my-4">
-              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 text-rose-500 mx-auto flex items-center justify-center">
-                <ShieldCheck className="w-6 h-6" />
+          {/* Search Form (Available to all visitors and clients) */}
+          <form onSubmit={handleSearch} className="mb-6">
+            <div className="flex gap-2">
+              <div className="relative flex-1">
+                <input
+                  type="text"
+                  required
+                  placeholder="Enter Order Code (BP-XXXX), bKash TrxID, or Phone..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-4 py-3 rounded-2xl bg-[#141414] border border-neutral-800 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
+                />
               </div>
-              <div>
-                <h3 className="text-sm font-bold text-white">Client Sign In Required</h3>
-                <p className="text-xs text-neutral-400 mt-1 max-w-md mx-auto">
-                  To protect your project files, private briefs, and invoice records, please sign in with your verified Google account.
-                </p>
-              </div>
+              <button
+                type="submit"
+                disabled={isLoading || !searchQuery.trim()}
+                className="px-5 sm:px-6 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50 cursor-pointer"
+              >
+                {isLoading ? (
+                  <span>Searching...</span>
+                ) : (
+                  <>
+                    <Search className="w-4 h-4" />
+                    <span>Track</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </form>
+
+          {!isAuthenticated && !orders && (
+            <div className="p-4 rounded-2xl bg-neutral-900/60 border border-neutral-800/80 flex items-center justify-between gap-3 text-xs text-neutral-400 mb-4">
+              <span className="flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+                <span>Want to see all your past orders and downloads in one place?</span>
+              </span>
               <button
                 onClick={() => {
                   onClose();
                   openAuthModal();
                 }}
-                className="px-6 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider inline-flex items-center gap-2 cursor-pointer shadow-lg shadow-rose-600/20"
+                className="text-rose-400 hover:text-rose-300 font-bold whitespace-nowrap cursor-pointer"
               >
-                <LogIn className="w-4 h-4" />
-                <span>Sign In with Google</span>
+                Sign In →
               </button>
             </div>
-          ) : (
-            <>
-              {/* Search Form */}
-              <form onSubmit={handleSearch} className="mb-6">
-                <div className="flex gap-2">
-                  <div className="relative flex-1">
-                    <input
-                      type="text"
-                      required
-                      placeholder="Enter Order Code (BP-XXXX) or TrxID..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="w-full px-4 py-3 rounded-2xl bg-[#141414] border border-neutral-800 text-xs sm:text-sm text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 transition-colors"
-                    />
-                  </div>
-                  <button
-                    type="submit"
-                    disabled={isLoading || !searchQuery.trim()}
-                    className="px-5 sm:px-6 py-3 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider flex items-center gap-2 transition-all shadow-lg shadow-rose-600/20 disabled:opacity-50 cursor-pointer"
-                  >
-                    {isLoading ? (
-                      <span>Searching...</span>
-                    ) : (
-                      <>
-                        <Search className="w-4 h-4" />
-                        <span>Track</span>
-                      </>
-                    )}
-                  </button>
-                </div>
-              </form>
-            </>
           )}
 
           {/* Error */}

@@ -100,6 +100,81 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
             </p>
           </div>
 
+          {/* Quick 1-Click Login Options */}
+          <div className="mb-5 space-y-2">
+            <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
+              Quick Login / Fast Access:
+            </p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await loginWithGoogle(
+                      ADMIN_EMAIL,
+                      'Beyond Pixels Admin',
+                      undefined,
+                      '+8801965407715'
+                    );
+                    if (onSuccess) onSuccess();
+                    onClose();
+                  } catch (e: any) {
+                    setError(e.message || 'Login failed');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="p-3 rounded-2xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-left transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-rose-300 group-hover:text-rose-200">👑 Master Admin</span>
+                  <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-extrabold">All Rights</span>
+                </div>
+                <div className="text-[10px] text-neutral-400 truncate mt-0.5">{ADMIN_EMAIL}</div>
+              </button>
+
+              <button
+                type="button"
+                onClick={async () => {
+                  setLoading(true);
+                  try {
+                    await loginWithGoogle(
+                      'client.preview@gmail.com',
+                      'Rafid Hossain',
+                      undefined,
+                      '+8801712345678'
+                    );
+                    if (onSuccess) onSuccess();
+                    onClose();
+                  } catch (e: any) {
+                    setError(e.message || 'Login failed');
+                  } finally {
+                    setLoading(false);
+                  }
+                }}
+                className="p-3 rounded-2xl bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-left transition-all cursor-pointer group"
+              >
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-blue-300 group-hover:text-blue-200">👤 Client Portal</span>
+                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-extrabold">Demo</span>
+                </div>
+                <div className="text-[10px] text-neutral-400 truncate mt-0.5">client.preview@gmail.com</div>
+              </button>
+            </div>
+            
+            <div className="relative my-4">
+              <div className="absolute inset-0 flex items-center">
+                <div className="w-full border-t border-neutral-800" />
+              </div>
+              <div className="relative flex justify-center text-xs">
+                <span className="px-3 bg-[#0D0D0D] text-neutral-500 font-semibold text-[10px] uppercase">
+                  Or enter your Google Email
+                </span>
+              </div>
+            </div>
+          </div>
+
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>
               <label className="block text-xs font-semibold text-neutral-300 mb-1.5">

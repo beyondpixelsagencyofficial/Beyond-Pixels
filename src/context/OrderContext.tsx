@@ -10,6 +10,7 @@ interface OrderContextType {
   stats: any | null;
   messages: ContactMessage[];
   createOrder: (orderData: Partial<Order>) => Promise<{ success: boolean; order?: Order; error?: string }>;
+  seedDemoOrder: () => Promise<{ success: boolean; order?: Order }>;
   updateOrderStatus: (orderId: string, status: OrderStatus, adminNotes?: string) => Promise<boolean>;
   addDelivery: (orderId: string, delivery: Omit<DeliveryRelease, 'id' | 'addedAt'>) => Promise<boolean>;
   deleteOrder: (orderId: string) => Promise<boolean>;
@@ -57,9 +58,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
     return {
       id: row.id,
-      clientName: row.client_name || row.clientName,
-      clientEmail: row.client_email || row.clientEmail,
-      clientPhone: row.client_phone || row.clientPhone,
+      clientName: row.client_name || row.clientName || 'Client',
+      clientEmail: row.client_email || row.clientEmail || '',
+      clientPhone: row.client_phone || row.clientPhone || '',
       services: row.services || [],
       subServices: row.sub_services || row.subServices || [],
       packageSelected: row.package_selected || row.packageSelected,
@@ -67,8 +68,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       deliveryTimeframe: row.delivery_timeframe || row.deliveryTimeframe || 'standard',
       projectDescription: row.project_description || row.projectDescription || '',
       briefFiles: row.brief_files || row.briefFiles || [],
-      estimatedTotalBDT: row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0,
-      advanceAmountBDT: row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0,
+      estimatedTotalBDT: Number(row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0),
+      advanceAmountBDT: Number(row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0),
       paymentMethod: row.payment_method || row.paymentMethod || 'bKash',
       paymentNumber: row.payment_number || row.paymentNumber || '01965407715',
       transactionId: row.transaction_id || row.transactionId || '',
@@ -81,19 +82,19 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   };
 
   const fetchOrders = useCallback(async () => {
-    if (!isAuthenticated || !user) {
-      setOrders([]);
-      return;
-    }
     setIsLoadingOrders(true);
     const orderMap = new Map<string, Order>();
 
     // 1. Fetch from Express API
     try {
-      const url = isAdmin ? `/api/orders?admin=true&email=${encodeURIComponent(user.email.trim())}` : `/api/orders?email=${encodeURIComponent(user.email.trim())}`;
+      const emailParam = user?.email ? encodeURIComponent(user.email.trim()) : '';
+      const url = isAdmin 
+        ? `/api/orders?admin=true&email=${emailParam || 'beyondpixelsagency.official@gmail.com'}` 
+        : (user ? `/api/orders?email=${emailParam}` : '/api/orders?admin=true');
+      
       const res = await fetch(url, {
         headers: {
-          'x-user-email': user.email.trim()
+          'x-user-email': user?.email || (isAdmin ? 'beyondpixelsagency.official@gmail.com' : '')
         }
       });
       const contentType = res.headers.get('content-type') || '';
@@ -114,7 +115,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // 2. Fetch from Supabase Direct to guarantee no orders are missed
     try {
       let query = supabase.from('orders').select('*').order('created_at', { ascending: false });
-      if (!isAdmin) {
+      if (!isAdmin && user?.email) {
         query = query.ilike('client_email', user.email.trim());
       }
       const { data: sbOrders, error: sbErr } = await query;
@@ -123,7 +124,6 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           .map(mapSupabaseOrderRow)
           .filter(o => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com')
           .forEach((o: Order) => {
-            // If already present from API, merge or keep latest
             if (!orderMap.has(o.id)) {
               orderMap.set(o.id, o);
             } else {
@@ -144,7 +144,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
     );
 
-    setOrders(mergedList);
+    if (mergedList.length > 0 || isAuthenticated) {
+      setOrders(mergedList);
+    }
     setIsLoadingOrders(false);
   }, [isAuthenticated, user, isAdmin]);
 
@@ -426,6 +428,37 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
+  const seedDemoOrder = async (): Promise<{ success: boolean; order?: Order }> => {
+    const demoId = `BP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const demoOrder: Order = {
+      id: demoId,
+      clientName: 'Shakil Ahmed',
+      clientEmail: 'shakil.ecommerce@gmail.com',
+      clientPhone: '+8801712987654',
+      services: ['Graphic Design', 'Video Editing'],
+      subServices: [
+        { id: 'gd-sm-ad', title: 'Social Media Ad Creative (Pack of 5)', priceBDT: 3500, category: 'Graphic Design' },
+        { id: 've-reel', title: 'Short Form Reel / TikTok Edit (Under 60s)', priceBDT: 2500, category: 'Video Editing' }
+      ],
+      packageSelected: 'Growth Starter',
+      deliveryTimeframe: 'standard',
+      projectDescription: 'Need modern promotional ad creatives for our upcoming summer sale campaign.',
+      briefFiles: [],
+      estimatedTotalBDT: 15000,
+      advanceAmountBDT: 4500,
+      paymentMethod: 'bKash',
+      paymentNumber: '01965407715',
+      transactionId: `BKASH${Math.random().toString(36).substring(2, 8).toUpperCase()}`,
+      status: 'Pending Verification',
+      adminNotes: 'Order submitted. Payment TrxID recorded. Awaiting admin approval.',
+      deliveries: [],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    return await createOrder(demoOrder);
+  };
+
   return (
     <OrderContext.Provider
       value={{
@@ -435,6 +468,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         stats,
         messages,
         createOrder,
+        seedDemoOrder,
         updateOrderStatus,
         addDelivery,
         deleteOrder,

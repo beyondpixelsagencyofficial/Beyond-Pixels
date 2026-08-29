@@ -341,12 +341,6 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
     e.preventDefault();
     setSubmissionError(null);
 
-    if (!isAuthenticated) {
-      setSubmissionError('Please sign in or create an account with Google to place and track your order.');
-      openAuthModal();
-      return;
-    }
-
     if (!clientName.trim()) {
       setSubmissionError('Please enter your full name');
       return;
@@ -373,6 +367,20 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
     setIsSubmitting(true);
 
     try {
+      // Auto-authenticate client with their entered credentials if not already logged in
+      if (!isAuthenticated) {
+        try {
+          await loginWithGoogle(
+            clientEmail.trim(),
+            clientName.trim(),
+            undefined,
+            clientPhone.trim()
+          );
+        } catch (authErr) {
+          console.warn('Auto client registration notice:', authErr);
+        }
+      }
+
       const finalServices: ServiceType[] = derivedServicesList.length > 0 
         ? derivedServicesList 
         : ['Graphic Design'];
