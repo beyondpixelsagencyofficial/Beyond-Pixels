@@ -565,7 +565,9 @@ app.put('/api/cms', async (req: Request, res: Response) => {
 
 // GET Orders (Admin gets all; Client gets their own by email)
 app.get('/api/orders', async (req: Request, res: Response) => {
-  const userEmail = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
+  const headerEmail = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
+  const queryEmail = (req.query.email as string || '').toLowerCase().trim();
+  const userEmail = headerEmail || queryEmail;
   
   // Real-time sync with Supabase so admin and users always have the latest orders
   try {
@@ -582,9 +584,9 @@ app.get('/api/orders', async (req: Request, res: Response) => {
           }
           return {
             id: row.id,
-            clientName: row.client_name || row.clientName,
-            clientEmail: row.client_email || row.clientEmail,
-            clientPhone: row.client_phone || row.clientPhone,
+            clientName: row.client_name || row.clientName || 'Client',
+            clientEmail: row.client_email || row.clientEmail || '',
+            clientPhone: row.client_phone || row.clientPhone || '',
             services: row.services || [],
             subServices: row.sub_services || row.subServices || [],
             packageSelected: row.package_selected || row.packageSelected,
@@ -592,8 +594,8 @@ app.get('/api/orders', async (req: Request, res: Response) => {
             deliveryTimeframe: row.delivery_timeframe || row.deliveryTimeframe || 'standard',
             projectDescription: row.project_description || row.projectDescription || '',
             briefFiles: row.brief_files || row.briefFiles || [],
-            estimatedTotalBDT: row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0,
-            advanceAmountBDT: row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0,
+            estimatedTotalBDT: Number(row.estimated_total_bdt || row.estimatedTotalBDT || row.estimated_total || 0),
+            advanceAmountBDT: Number(row.advance_amount_bdt || row.advanceAmountBDT || row.advance_amount || 0),
             paymentMethod: row.payment_method || row.paymentMethod || 'bKash',
             paymentNumber: row.payment_number || row.paymentNumber || '01965407715',
             transactionId: row.transaction_id || row.transactionId || '',
@@ -606,7 +608,7 @@ app.get('/api/orders', async (req: Request, res: Response) => {
         })
         .filter((o: any) => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
 
-      const map = new Map();
+      const map = new Map<string, any>();
       mappedOrders.forEach((o: any) => map.set(o.id, o));
       ordersData.forEach((o: any) => {
         if (!map.has(o.id)) map.set(o.id, o);
@@ -620,10 +622,12 @@ app.get('/api/orders', async (req: Request, res: Response) => {
     console.warn('Orders on-demand sync notice:', syncErr);
   }
 
-  if (userEmail === 'beyondpixelsagency.official@gmail.com') {
+  // Admin access
+  if (userEmail === 'beyondpixelsagency.official@gmail.com' || req.query.admin === 'true') {
     return res.json(ordersData);
   }
 
+  // Client access by email
   if (userEmail) {
     const userOrders = ordersData.filter(o => o.clientEmail && o.clientEmail.toLowerCase().trim() === userEmail);
     return res.json(userOrders);
@@ -650,7 +654,6 @@ app.get('/api/orders/track', (req: Request, res: Response) => {
     return res.status(404).json({ error: 'No order found matching this tracking code or phone number.' });
   }
 
-  // Sanitize slightly for public view if needed, but return status, advance, deliveries
   res.json({ success: true, results: found });
 });
 
@@ -668,6 +671,7 @@ app.get('/api/orders/:id', (req: Request, res: Response) => {
 app.post('/api/orders', async (req: Request, res: Response) => {
   try {
     const {
+      id: customId,
       clientName,
       clientEmail,
       clientPhone,
@@ -704,7 +708,10 @@ app.post('/api/orders', async (req: Request, res: Response) => {
     const finalTotalBDT = Number(estimatedTotalBDT || estimatedTotal) || 3500;
     const finalAdvanceBDT = Number(advanceAmountBDT || advanceAmount) || Math.round(finalTotalBDT * 0.3);
 
-    const newId = `BP-${Math.floor(1000 + Math.random() * 9000)}`;
+    const newId = customId && typeof customId === 'string' && customId.startsWith('BP-') 
+      ? customId 
+      : `BP-${Math.floor(1000 + Math.random() * 9000)}`;
+
     const newOrder = {
       id: newId,
       clientName: clientName.trim(),
@@ -730,6 +737,8 @@ app.post('/api/orders', async (req: Request, res: Response) => {
       updatedAt: new Date().toISOString()
     };
 
+    // Remove any existing order with same ID before unshifting
+    ordersData = ordersData.filter(o => o.id !== newOrder.id);
     ordersData.unshift(newOrder);
     saveData(ORDERS_FILE, ordersData);
 
@@ -745,6 +754,7 @@ app.post('/api/orders', async (req: Request, res: Response) => {
       if (existingUserIndex >= 0) {
         const updatedUser: ServerUser = {
           ...usersData[existingUserIndex],
+          name: newOrder.clientName || usersData[existingUserIndex].name,
           phone: newOrder.clientPhone || usersData[existingUserIndex].phone,
           lastLoginAt: now
         };
@@ -780,24 +790,94 @@ app.post('/api/orders', async (req: Request, res: Response) => {
 // ---------------- USER & CLIENT AUTH SYNC ROUTES ----------------
 
 // GET All Registered Users / Clients (Admin / Supervisor)
-app.get('/api/users', (req: Request, res: Response) => {
-  const userEmail = (req.headers['x-user-email'] as string || '').toLowerCase();
+app.get('/api/users', async (req: Request, res: Response) => {
+  const headerEmail = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
+  const queryEmail = (req.query.email as string || '').toLowerCase().trim();
+  const userEmail = headerEmail || queryEmail;
+
   // Allow admin email
-  if (userEmail && userEmail !== 'beyondpixelsagency.official@gmail.com') {
+  if (userEmail && userEmail !== 'beyondpixelsagency.official@gmail.com' && req.query.admin !== 'true') {
     return res.status(403).json({ error: 'Unauthorized: Supervisor access required' });
   }
 
-  // Enrich users with live orders count & lifetime spend in BDT
+  // 1. Sync from Supabase users table on demand
+  try {
+    const { data: remoteUsers, error: usersErr } = await supabase
+      .from('users')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (!usersErr && remoteUsers && remoteUsers.length > 0) {
+      const userMap = new Map<string, ServerUser>();
+      usersData.forEach(u => userMap.set(u.email.toLowerCase(), u));
+
+      remoteUsers.forEach((r: any) => {
+        const email = (r.email || r.data?.email || '').toLowerCase().trim();
+        if (email) {
+          const rawData = r.data || {};
+          userMap.set(email, {
+            id: r.id || rawData.id || `usr_${Date.now()}`,
+            email,
+            name: r.name || rawData.name || email.split('@')[0],
+            phone: r.phone || rawData.phone || '',
+            avatar: r.avatar || rawData.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(r.name || email)}&backgroundColor=0ea5e9,6366f1,10b981`,
+            company: r.company || rawData.company || '',
+            role: r.role || rawData.role || (email === 'beyondpixelsagency.official@gmail.com' ? 'admin' : 'client'),
+            createdAt: r.created_at || rawData.createdAt || new Date().toISOString(),
+            lastLoginAt: r.last_login_at || rawData.lastLoginAt || new Date().toISOString()
+          });
+        }
+      });
+
+      usersData = Array.from(userMap.values());
+      saveData(USERS_FILE, usersData);
+    }
+  } catch (err) {
+    console.warn('Users on-demand sync notice:', err);
+  }
+
+  // 2. Discover and register any client from ordersData
+  ordersData.forEach(o => {
+    if (o.clientEmail) {
+      const email = o.clientEmail.toLowerCase().trim();
+      const existing = usersData.find(u => u.email.toLowerCase() === email);
+      if (!existing) {
+        const newUser: ServerUser = {
+          id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+          name: o.clientName || email.split('@')[0],
+          email: email,
+          phone: o.clientPhone || '',
+          avatar: `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(o.clientName || email)}&backgroundColor=0ea5e9,6366f1,10b981`,
+          role: email === 'beyondpixelsagency.official@gmail.com' ? 'admin' : 'client',
+          createdAt: o.createdAt || new Date().toISOString(),
+          lastLoginAt: o.createdAt || new Date().toISOString()
+        };
+        usersData.push(newUser);
+      } else {
+        if (!existing.phone && o.clientPhone) {
+          existing.phone = o.clientPhone;
+        }
+        if (!existing.name && o.clientName) {
+          existing.name = o.clientName;
+        }
+      }
+    }
+  });
+
+  saveData(USERS_FILE, usersData);
+
+  // 3. Enrich users with live orders count & lifetime spend in BDT & order status
   const enrichedUsers = usersData.map(u => {
-    const userOrders = ordersData.filter(o => o.clientEmail.toLowerCase() === u.email.toLowerCase());
+    const userOrders = ordersData.filter(o => o.clientEmail && o.clientEmail.toLowerCase().trim() === u.email.toLowerCase().trim());
     const totalSpent = userOrders
       .filter(o => o.status !== 'Rejected')
-      .reduce((sum, o) => sum + (o.estimatedTotalBDT || (o as any).estimatedTotal || 0), 0);
+      .reduce((sum, o) => sum + (Number(o.estimatedTotalBDT) || Number((o as any).estimatedTotal) || 0), 0);
 
     return {
       ...u,
       ordersCount: userOrders.length,
-      totalSpentBDT: totalSpent
+      totalSpentBDT: totalSpent,
+      orders: userOrders
     };
   });
 

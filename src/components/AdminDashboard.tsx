@@ -55,6 +55,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
   const [orderStatusFilter, setOrderStatusFilter] = useState<string>('all');
   const [orderSearch, setOrderSearch] = useState('');
   const [userSearch, setUserSearch] = useState('');
+  const [userFilterTab, setUserFilterTab] = useState<'all' | 'with-orders' | 'visitors' | 'admin'>('all');
+  const [selectedUserForModal, setSelectedUserForModal] = useState<User | null>(null);
   const [usersList, setUsersList] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
@@ -830,7 +832,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
         {activeAdminTab === 'users' && (
           <div className="space-y-6">
             {/* Header / Filter Toolbar */}
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="relative flex-1 max-w-md">
                 <input
                   type="text"
@@ -842,23 +844,52 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                 <Search className="w-4 h-4 text-neutral-500 absolute left-3 top-3 pointer-events-none" />
               </div>
 
-              <div className="flex items-center gap-3">
-                <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-400 text-xs font-semibold">
-                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-                  <span>Supabase Cloud Synced</span>
-                </div>
+              {/* Filter Tabs */}
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  onClick={() => setUserFilterTab('all')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    userFilterTab === 'all'
+                      ? 'bg-rose-600 text-white shadow-md shadow-rose-600/20'
+                      : 'bg-[#0D0D0D] border border-neutral-800 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  All Users ({usersList.length})
+                </button>
+                <button
+                  onClick={() => setUserFilterTab('with-orders')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    userFilterTab === 'with-orders'
+                      ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/20'
+                      : 'bg-[#0D0D0D] border border-neutral-800 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  <Package className="w-3.5 h-3.5" />
+                  <span>With Orders ({usersList.filter(u => (u.ordersCount || 0) > 0).length})</span>
+                </button>
+                <button
+                  onClick={() => setUserFilterTab('visitors')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                    userFilterTab === 'visitors'
+                      ? 'bg-blue-600 text-white shadow-md shadow-blue-600/20'
+                      : 'bg-[#0D0D0D] border border-neutral-800 text-neutral-400 hover:text-white'
+                  }`}
+                >
+                  Logged-in Visitors ({usersList.filter(u => (!u.ordersCount || u.ordersCount === 0) && u.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase()).length})
+                </button>
                 <button
                   onClick={loadUsers}
                   disabled={loadingUsers}
-                  className="px-3 py-2 rounded-xl bg-[#0D0D0D] border border-neutral-800 hover:bg-neutral-800 text-neutral-300 text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  className="px-3 py-1.5 rounded-xl bg-[#0D0D0D] border border-neutral-800 hover:bg-neutral-800 text-neutral-300 text-xs font-bold transition-colors flex items-center gap-2 cursor-pointer disabled:opacity-50"
+                  title="Reload users from Supabase and Server"
                 >
                   <RefreshCw className={`w-3.5 h-3.5 ${loadingUsers ? 'animate-spin' : ''}`} />
-                  <span>{loadingUsers ? 'Syncing...' : 'Refresh Users'}</span>
+                  <span>{loadingUsers ? 'Syncing...' : 'Sync Users'}</span>
                 </button>
               </div>
             </div>
 
-            {/* Users Summary Cards */}
+            {/* Users Summary Metrics Cards */}
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div className="p-4 rounded-2xl bg-[#0D0D0D] border border-neutral-800">
                 <div className="text-xs font-semibold text-neutral-400">Total User Accounts</div>
@@ -893,26 +924,41 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
 
             {/* Users List Table / Cards */}
             {usersList.length === 0 ? (
-              <div className="p-12 text-center rounded-3xl bg-[#0D0D0D] border border-neutral-800 text-neutral-400 text-xs">
-                {loadingUsers ? 'Loading registered accounts...' : 'No registered users found yet.'}
+              <div className="p-12 text-center rounded-3xl bg-[#0D0D0D] border border-neutral-800 text-neutral-400 text-xs space-y-2">
+                <Users className="w-8 h-8 text-neutral-600 mx-auto" />
+                <p className="font-semibold text-neutral-300">{loadingUsers ? 'Loading registered accounts...' : 'No registered users found yet.'}</p>
+                <p className="text-[11px] text-neutral-500">When visitors log in with Google or submit an order, their profiles automatically register here.</p>
               </div>
             ) : (
               <div className="space-y-3">
                 {usersList
                   .filter(u => {
                     const q = userSearch.toLowerCase();
-                    return (
-                      !q ||
+                    const matchesSearch = !q ||
                       (u.name && u.name.toLowerCase().includes(q)) ||
                       (u.email && u.email.toLowerCase().includes(q)) ||
                       (u.phone && u.phone.toLowerCase().includes(q)) ||
-                      (u.company && u.company.toLowerCase().includes(q))
-                    );
+                      (u.company && u.company.toLowerCase().includes(q));
+                    
+                    if (!matchesSearch) return false;
+
+                    if (userFilterTab === 'with-orders') {
+                      return (u.ordersCount || 0) > 0;
+                    }
+                    if (userFilterTab === 'visitors') {
+                      return (!u.ordersCount || u.ordersCount === 0) && u.email.toLowerCase() !== ADMIN_EMAIL.toLowerCase();
+                    }
+                    if (userFilterTab === 'admin') {
+                      return u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+                    }
+                    return true;
                   })
                   .map((usr) => {
                     const isAdmin = usr.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
                     const cleanPhone = (usr.phone || '').replace(/[^0-9+]/g, '');
                     const waNumber = cleanPhone.startsWith('+') ? cleanPhone.slice(1) : cleanPhone.startsWith('880') ? cleanPhone : `880${cleanPhone.replace(/^0+/, '')}`;
+                    const clientOrders = orders.filter(o => o.clientEmail && o.clientEmail.toLowerCase() === usr.email.toLowerCase());
+                    const activeCount = clientOrders.length > 0 ? clientOrders.length : (usr.ordersCount || 0);
 
                     return (
                       <div
@@ -924,7 +970,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                           <img
                             src={usr.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(usr.name || 'User')}`}
                             alt={usr.name || 'User'}
-                            className="w-12 h-12 rounded-2xl border border-neutral-700 object-cover bg-neutral-900"
+                            className="w-12 h-12 rounded-2xl border border-neutral-700 object-cover bg-neutral-900 shrink-0"
                             referrerPolicy="no-referrer"
                           />
                           <div>
@@ -932,10 +978,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                               <span className="font-bold text-white text-sm">{usr.name || 'Unnamed Client'}</span>
                               <span
                                 className={`px-2 py-0.5 rounded-full text-[9px] font-extrabold uppercase ${
-                                  isAdmin ? 'bg-rose-600 text-white' : 'bg-neutral-800 text-neutral-300 border border-neutral-700'
+                                  isAdmin ? 'bg-rose-600 text-white' : activeCount > 0 ? 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30' : 'bg-neutral-800 text-neutral-300 border border-neutral-700'
                                 }`}
                               >
-                                {isAdmin ? 'Master Supervisor' : 'Client Account'}
+                                {isAdmin ? 'Master Supervisor' : activeCount > 0 ? `${activeCount} Order${activeCount === 1 ? '' : 's'}` : 'Logged In'}
                               </span>
                             </div>
                             <div className="text-neutral-400 font-mono text-[11px] mt-0.5 flex items-center gap-1.5">
@@ -950,7 +996,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                         </div>
 
                         {/* Contact & Phone */}
-                        <div className="space-y-1 min-w-[160px]">
+                        <div className="space-y-1 min-w-[150px]">
                           <div className="text-[10px] text-neutral-500 font-semibold uppercase tracking-wider">
                             Contact / Phone
                           </div>
@@ -982,7 +1028,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                             Orders & Spend
                           </div>
                           <div className="text-white font-bold text-xs">
-                            {usr.ordersCount || 0} Project{(usr.ordersCount || 0) === 1 ? '' : 's'}
+                            {activeCount} Project{activeCount === 1 ? '' : 's'}
                           </div>
                           <div className="text-emerald-400 font-bold text-xs">
                             ৳{(usr.totalSpentBDT || 0).toLocaleString()} <span className="text-[10px] text-neutral-500 font-normal">BDT</span>
@@ -991,7 +1037,16 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
 
                         {/* Action Buttons */}
                         <div className="flex flex-wrap items-center gap-2 pt-2 md:pt-0">
-                          {usr.ordersCount && usr.ordersCount > 0 ? (
+                          <button
+                            onClick={() => setSelectedUserForModal(usr)}
+                            className="px-3 py-1.5 rounded-xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-rose-300 font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
+                            title="View Full Profile and Order History"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-rose-400" />
+                            <span>Details</span>
+                          </button>
+
+                          {activeCount > 0 ? (
                             <button
                               onClick={() => {
                                 setOrderSearch(usr.email);
@@ -1000,8 +1055,8 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                               className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs transition-colors flex items-center gap-1.5 cursor-pointer"
                               title="View this client's orders in the orders tab"
                             >
-                              <Package className="w-3.5 h-3.5 text-rose-500" />
-                              <span>Orders</span>
+                              <Package className="w-3.5 h-3.5 text-emerald-400" />
+                              <span>Orders ({activeCount})</span>
                             </button>
                           ) : null}
 
@@ -1035,6 +1090,193 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
           </div>
         )}
       </div>
+
+      {/* MODAL: USER DETAILS & CLIENT ORDER HISTORY */}
+      <AnimatePresence>
+        {selectedUserForModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedUserForModal(null)}
+              className="absolute inset-0 bg-black/85 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-2xl bg-[#0D0D0D] border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white z-10 space-y-6 max-h-[90vh] overflow-y-auto"
+            >
+              <div className="flex items-start justify-between pb-4 border-b border-neutral-800">
+                <div className="flex items-center gap-4">
+                  <img
+                    src={selectedUserForModal.avatar || `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(selectedUserForModal.name || 'User')}`}
+                    alt={selectedUserForModal.name || 'User'}
+                    className="w-14 h-14 rounded-2xl border border-neutral-700 object-cover bg-neutral-900"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div>
+                    <h3 className="text-lg font-black text-white flex items-center gap-2">
+                      {selectedUserForModal.name || 'Client Account'}
+                      <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase ${
+                        selectedUserForModal.email.toLowerCase() === ADMIN_EMAIL.toLowerCase()
+                          ? 'bg-rose-600 text-white'
+                          : 'bg-emerald-600/20 text-emerald-400 border border-emerald-500/30'
+                      }`}>
+                        {selectedUserForModal.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() ? 'Master Admin' : 'Client Account'}
+                      </span>
+                    </h3>
+                    <p className="text-xs text-neutral-400 font-mono mt-0.5">{selectedUserForModal.email}</p>
+                    {selectedUserForModal.phone && (
+                      <p className="text-xs text-emerald-400 font-mono mt-0.5">📞 {selectedUserForModal.phone}</p>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => setSelectedUserForModal(null)}
+                  className="text-neutral-400 hover:text-white p-1 rounded-xl hover:bg-neutral-800 cursor-pointer"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Client Metrics Strip */}
+              <div className="grid grid-cols-3 gap-3">
+                <div className="p-3.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="text-[10px] text-neutral-400 uppercase font-semibold">Total Orders</div>
+                  <div className="text-base font-bold text-white mt-0.5">
+                    {orders.filter(o => o.clientEmail && o.clientEmail.toLowerCase() === selectedUserForModal.email.toLowerCase()).length} Projects
+                  </div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="text-[10px] text-neutral-400 uppercase font-semibold">Total Spend</div>
+                  <div className="text-base font-bold text-emerald-400 mt-0.5">
+                    ৳{(selectedUserForModal.totalSpentBDT || 0).toLocaleString()} BDT
+                  </div>
+                </div>
+                <div className="p-3.5 rounded-xl bg-neutral-900/80 border border-neutral-800">
+                  <div className="text-[10px] text-neutral-400 uppercase font-semibold">Registered Date</div>
+                  <div className="text-xs font-semibold text-neutral-300 mt-1">
+                    {selectedUserForModal.createdAt ? new Date(selectedUserForModal.createdAt).toLocaleDateString() : 'Active'}
+                  </div>
+                </div>
+              </div>
+
+              {/* Client Orders List */}
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-neutral-300 flex items-center gap-2">
+                    <Package className="w-4 h-4 text-rose-500" />
+                    <span>Client Orders & Projects</span>
+                  </h4>
+                  <button
+                    onClick={() => {
+                      setOrderSearch(selectedUserForModal.email);
+                      setSelectedUserForModal(null);
+                      setActiveAdminTab('orders');
+                    }}
+                    className="text-xs text-rose-400 hover:text-rose-300 font-semibold cursor-pointer"
+                  >
+                    View in Orders Tab →
+                  </button>
+                </div>
+
+                {(() => {
+                  const userOrders = orders.filter(o => o.clientEmail && o.clientEmail.toLowerCase() === selectedUserForModal.email.toLowerCase());
+                  if (userOrders.length === 0) {
+                    return (
+                      <div className="p-6 rounded-2xl bg-neutral-900/40 border border-neutral-800 text-center text-xs text-neutral-400">
+                        No orders recorded for this account yet. This user logged in via Google Auth.
+                      </div>
+                    );
+                  }
+                  return userOrders.map(order => (
+                    <div
+                      key={order.id}
+                      className="p-4 rounded-2xl bg-neutral-900/90 border border-neutral-800 space-y-3"
+                    >
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <span className="font-mono font-black text-rose-400 text-xs">{order.id}</span>
+                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold ${
+                            order.status === 'Completed'
+                              ? 'bg-emerald-600/20 text-emerald-400'
+                              : order.status === 'In Progress'
+                              ? 'bg-blue-600/20 text-blue-400'
+                              : 'bg-amber-600/20 text-amber-400'
+                          }`}>
+                            {order.status}
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-neutral-400">
+                          {new Date(order.createdAt).toLocaleDateString()}
+                        </span>
+                      </div>
+
+                      <div className="text-xs text-white font-semibold">
+                        {order.packageSelected || (order.services && order.services.join(', ')) || 'Custom Creative Services'}
+                      </div>
+
+                      {order.subServices && order.subServices.length > 0 && (
+                        <div className="flex flex-wrap gap-1.5">
+                          {order.subServices.map((sub, idx) => (
+                            <span key={idx} className="px-2 py-0.5 rounded-lg bg-neutral-800 text-[10px] text-neutral-300">
+                              {sub.title}
+                            </span>
+                          ))}
+                        </div>
+                      )}
+
+                      <div className="grid grid-cols-3 gap-2 pt-2 border-t border-neutral-800 text-xs">
+                        <div>
+                          <span className="text-[10px] text-neutral-500 block">Total Price:</span>
+                          <span className="font-bold text-white">৳{(order.estimatedTotalBDT || 0).toLocaleString()}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-neutral-500 block">30% Advance (TrxID):</span>
+                          <span className="font-bold text-emerald-400">৳{(order.advanceAmountBDT || 0).toLocaleString()}</span>
+                          <span className="block font-mono text-[10px] text-neutral-400">{order.transactionId || 'N/A'}</span>
+                        </div>
+                        <div>
+                          <span className="text-[10px] text-neutral-500 block">Deliveries:</span>
+                          <span className="font-bold text-blue-400">{order.deliveries?.length || 0} Files</span>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 pt-2">
+                        <button
+                          onClick={() => {
+                            setSelectedUserForModal(null);
+                            setSelectedInvoiceOrder(order);
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Receipt className="w-3.5 h-3.5 text-rose-400" />
+                          <span>Invoice</span>
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSelectedUserForModal(null);
+                            setStatusModalOrder(order);
+                            setNewStatus(order.status);
+                            setAdminNotesText(order.adminNotes || '');
+                          }}
+                          className="px-3 py-1.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 text-rose-400 font-semibold text-xs flex items-center gap-1.5 cursor-pointer"
+                        >
+                          <Edit3 className="w-3.5 h-3.5" />
+                          <span>Update Status</span>
+                        </button>
+                      </div>
+                    </div>
+                  ));
+                })()}
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL: ADD DELIVERY LINK */}
       <AnimatePresence>

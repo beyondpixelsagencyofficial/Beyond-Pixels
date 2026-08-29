@@ -165,14 +165,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   const fetchRegisteredUsers = async (): Promise<User[]> => {
     try {
-      const res = await fetch('/api/users', {
+      const adminMail = (user?.email || ADMIN_EMAIL).trim().toLowerCase();
+      const res = await fetch(`/api/users?admin=true&email=${encodeURIComponent(adminMail)}`, {
         headers: {
-          'x-user-email': user?.email || ADMIN_EMAIL
+          'x-user-email': adminMail
         }
       });
       if (res.ok) {
         const users = await res.json();
-        return users;
+        if (Array.isArray(users)) {
+          return users;
+        }
       }
     } catch (e) {
       console.warn('Error fetching users from server:', e);

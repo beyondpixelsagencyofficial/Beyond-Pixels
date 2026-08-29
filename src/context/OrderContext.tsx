@@ -90,9 +90,10 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // 1. Fetch from Express API
     try {
-      const res = await fetch('/api/orders', {
+      const url = isAdmin ? `/api/orders?admin=true&email=${encodeURIComponent(user.email.trim())}` : `/api/orders?email=${encodeURIComponent(user.email.trim())}`;
+      const res = await fetch(url, {
         headers: {
-          'x-user-email': user.email
+          'x-user-email': user.email.trim()
         }
       });
       const contentType = res.headers.get('content-type') || '';
@@ -254,7 +255,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           'Content-Type': 'application/json',
           'x-user-email': user?.email || newOrder.clientEmail
         },
-        body: JSON.stringify(orderData)
+        body: JSON.stringify(newOrder)
       });
 
       const contentType = res.headers.get('content-type') || '';
