@@ -1003,8 +1003,10 @@ app.get('/api/stats', (req: Request, res: Response) => {
 
 // ---------------- SERVER BOOTSTRAP ----------------
 async function startServer() {
-  // Sync with Supabase on startup
-  await syncFromSupabase();
+  // Sync with Supabase on startup non-blockingly
+  syncFromSupabase().catch(err => {
+    console.warn('⚠️ Supabase background sync notice:', err);
+  });
 
   if (process.env.NODE_ENV !== 'production') {
     const vite = await createViteServer({

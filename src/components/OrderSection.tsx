@@ -406,11 +406,19 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
           origin: { y: 0.6 }
         });
       } else {
-        setSubmissionError(res.error || 'Failed to place order. Please verify your payment details and try again.');
+        const rawErr = String(res.error || '');
+        const cleanMsg = rawErr.includes('NOT_FOUND') || rawErr.includes('<!DOCTYPE') || rawErr.includes('<html')
+          ? 'Unable to connect to order server. Please verify your internet and try again.'
+          : (rawErr || 'Failed to place order. Please verify your payment details and try again.');
+        setSubmissionError(cleanMsg);
       }
     } catch (err: any) {
       console.error('Order submission error:', err);
-      setSubmissionError(err.message || 'An unexpected error occurred while placing your order.');
+      const raw = String(err?.message || '');
+      const cleanMsg = raw.includes('NOT_FOUND') || raw.includes('<!DOCTYPE') || raw.includes('<html')
+        ? 'A temporary network interruption occurred. Please try again.'
+        : (raw || 'An unexpected error occurred while placing your order.');
+      setSubmissionError(cleanMsg);
     } finally {
       setIsSubmitting(false);
     }
