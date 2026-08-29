@@ -635,7 +635,12 @@ app.post('/api/orders', async (req: Request, res: Response) => {
       transactionId
     } = req.body;
 
-    if (!clientName || !clientEmail || !clientPhone || (!services || services.length === 0) && !packageSelected && (!subServices || subServices.length === 0)) {
+    const hasServiceSelected = (Array.isArray(services) && services.length > 0) || 
+      Boolean(packageSelected) || 
+      (Array.isArray(subServices) && subServices.length > 0) || 
+      (Number(adDollarBudget) > 0);
+
+    if (!clientName || !clientEmail || !clientPhone || !hasServiceSelected) {
       return res.status(400).json({ error: 'Missing required client or service details' });
     }
 
