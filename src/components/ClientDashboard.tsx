@@ -44,7 +44,7 @@ export const ClientDashboard: React.FC<ClientDashboardProps> = ({
   initialTab = 'orders',
   highlightOrderId
 }) => {
-  const { user, updateProfile } = useAuth();
+  const { user, isAdmin, updateProfile, loginWithGoogle } = useAuth();
   const { orders, isLoadingOrders } = useOrders();
   
   const [activeTab, setActiveTab] = useState<'orders' | 'profile'>(initialTab);

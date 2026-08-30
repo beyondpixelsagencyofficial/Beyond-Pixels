@@ -437,6 +437,7 @@ async function deleteUserFromSupabase(id: string) {
 }
 
 // Push an order to Supabase
+// Supabase Order Payload Mapper and Push
 async function pushOrderToSupabase(order: any) {
   try {
     const payload = {
@@ -444,31 +445,34 @@ async function pushOrderToSupabase(order: any) {
       client_name: order.clientName,
       client_email: order.clientEmail,
       client_phone: order.clientPhone,
-      services: order.services,
+      services: order.services || [],
+      sub_services: order.subServices || [],
       package_selected: order.packageSelected || null,
       ad_dollar_budget: order.adDollarBudget || null,
-      delivery_timeframe: order.deliveryTimeframe,
-      project_description: order.projectDescription,
-      estimated_total_bdt: order.estimatedTotalBDT,
-      advance_amount_bdt: order.advanceAmountBDT,
-      payment_method: order.paymentMethod,
-      payment_number: order.paymentNumber,
-      transaction_id: order.transactionId,
-      status: order.status,
-      admin_notes: order.adminNotes,
-      deliveries: order.deliveries,
-      created_at: order.createdAt,
-      updated_at: order.updatedAt,
+      ad_dollar_rate_bdt: order.adDollarRateBDT || 148,
+      delivery_timeframe: order.deliveryTimeframe || 'standard',
+      project_description: order.projectDescription || '',
+      brief_files: order.briefFiles || [],
+      estimated_total_bdt: Number(order.estimatedTotalBDT || (order as any).estimatedTotal || 0),
+      advance_amount_bdt: Number(order.advanceAmountBDT || (order as any).advanceAmount || 0),
+      payment_method: order.paymentMethod || 'bKash',
+      payment_number: order.paymentNumber || '01965407715',
+      transaction_id: order.transactionId || '',
+      status: order.status || 'Pending Verification',
+      admin_notes: order.adminNotes || '',
+      deliveries: order.deliveries || [],
+      created_at: order.createdAt || new Date().toISOString(),
+      updated_at: order.updatedAt || new Date().toISOString(),
       data: order
     };
 
-    const { error } = await supabase.from('orders').upsert(payload);
+    const { error } = await supabase.from('orders').upsert(payload, { onConflict: 'id' });
     if (error) {
-      // If table has simpler schema, try upserting with id & data json
-      await supabase.from('orders').upsert({ id: order.id, data: order });
+      console.warn('Primary Supabase orders upsert notice, trying json fallback:', error.message);
+      await supabase.from('orders').upsert({ id: order.id, data: order }, { onConflict: 'id' });
     }
-  } catch (e) {
-    console.warn('Supabase order push notice:', e);
+  } catch (e: any) {
+    console.warn('Supabase order push notice:', e.message || e);
   }
 }
 
@@ -609,9 +613,26 @@ app.get('/api/orders', async (req: Request, res: Response) => {
         .filter((o: any) => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
 
       const map = new Map<string, any>();
-      mappedOrders.forEach((o: any) => map.set(o.id, o));
+      // First populate with local server in-memory & disk orders
       ordersData.forEach((o: any) => {
-        if (!map.has(o.id)) map.set(o.id, o);
+        if (o && o.id) map.set(o.id, o);
+      });
+      // Merge with remote Supabase orders without losing local fields
+      mappedOrders.forEach((o: any) => {
+        if (o && o.id) {
+          if (!map.has(o.id)) {
+            map.set(o.id, o);
+          } else {
+            const local = map.get(o.id);
+            const remoteTime = new Date(o.updatedAt || o.createdAt || 0).getTime();
+            const localTime = new Date(local.updatedAt || local.createdAt || 0).getTime();
+            if (remoteTime >= localTime) {
+              map.set(o.id, { ...local, ...o });
+            } else {
+              map.set(o.id, { ...o, ...local });
+            }
+          }
+        }
       });
       ordersData = Array.from(map.values()).sort((a: any, b: any) => 
         new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()

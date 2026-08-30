@@ -40,6 +40,34 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [stats, setStats] = useState<any | null>(null);
   const [messages, setMessages] = useState<ContactMessage[]>([]);
   const { user, isAdmin, isAuthenticated } = useAuth();
+  const prevOrdersCountRef = React.useRef<number | null>(null);
+
+  // Audio chime synthesis for new incoming orders
+  const playOrderChime = () => {
+    try {
+      const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContextClass) return;
+      const ctx = new AudioContextClass();
+      const now = ctx.currentTime;
+      
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(659.25, now); // E5
+      osc.frequency.setValueAtTime(830.61, now + 0.12); // G#5
+      osc.frequency.setValueAtTime(987.77, now + 0.24); // B5
+      
+      gain.gain.setValueAtTime(0.25, now);
+      gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.85);
+      
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.9);
+    } catch (e) {
+      // Audio autoplay policy catch
+    }
+  };
 
   // Save cache
   useEffect(() => {
@@ -144,8 +172,17 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
     );
 
-    if (mergedList.length > 0 || isAuthenticated) {
-      setOrders(mergedList);
+    // If new orders arrived for Admin, trigger audio chime
+    if (isAdmin && prevOrdersCountRef.current !== null && mergedList.length > prevOrdersCountRef.current) {
+      playOrderChime();
+    }
+    prevOrdersCountRef.current = mergedList.length;
+
+    setOrders(mergedList);
+    try {
+      localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify(mergedList));
+    } catch (e) {
+      // Storage quota catch
     }
     setIsLoadingOrders(false);
   }, [isAuthenticated, user, isAdmin]);
@@ -182,7 +219,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   }, [isAdmin, user]);
 
-  // Initial load and live polling interval
+  // Initial load, live polling interval, and focus sync
   useEffect(() => {
     fetchOrders();
     if (isAdmin) {
@@ -190,16 +227,25 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       fetchMessages();
     }
 
-    // Auto-poll orders every 8 seconds for live dashboard updates
+    // Auto-poll orders every 3.5 seconds for live dashboard updates
     const pollInterval = setInterval(() => {
-      if (isAuthenticated && user) {
-        fetchOrders();
-        if (isAdmin) {
-          fetchStats();
-          fetchMessages();
-        }
+      fetchOrders();
+      if (isAdmin) {
+        fetchStats();
+        fetchMessages();
       }
-    }, 8000);
+    }, 3500);
+
+    // Sync immediately on window focus or tab visibility change
+    const handleFocus = () => {
+      fetchOrders();
+      if (isAdmin) {
+        fetchStats();
+        fetchMessages();
+      }
+    };
+    window.addEventListener('focus', handleFocus);
+    document.addEventListener('visibilitychange', handleFocus);
 
     // Supabase Realtime table listener
     const channel = supabase
@@ -212,6 +258,8 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     return () => {
       clearInterval(pollInterval);
+      window.removeEventListener('focus', handleFocus);
+      document.removeEventListener('visibilitychange', handleFocus);
       supabase.removeChannel(channel);
     };
   }, [fetchOrders, fetchStats, fetchMessages, isAdmin, isAuthenticated, user]);

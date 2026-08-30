@@ -163,6 +163,42 @@ export const Header: React.FC<HeaderProps> = ({
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-neutral-700" />}
           </button>
 
+          {/* Admin Direct Button (When logged in as Admin) */}
+          {isAuthenticated && isAdmin && (
+            <button
+              id="header-admin-direct-cta"
+              onClick={() => setCurrentView('dashboard')}
+              className="px-3.5 py-2.5 rounded-xl text-xs font-black uppercase tracking-wider bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/40 text-rose-400 hover:text-rose-300 transition-all flex items-center gap-1.5 cursor-pointer shadow-xs"
+              title="Open Admin Control Center"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 text-rose-500" />
+              <span>Admin Panel</span>
+              {pendingOrActiveCount > 0 && (
+                <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                  {pendingOrActiveCount}
+                </span>
+              )}
+            </button>
+          )}
+
+          {/* Client Portal Button (When logged in as standard client) */}
+          {isAuthenticated && !isAdmin && (
+            <button
+              id="header-client-portal-cta"
+              onClick={() => setCurrentView('dashboard')}
+              className="px-3.5 py-2.5 rounded-xl text-xs font-bold border border-blue-500/30 bg-blue-500/10 hover:bg-blue-500/20 text-blue-400 hover:text-blue-300 transition-all flex items-center gap-1.5 cursor-pointer"
+              title="Open Client Orders Portal"
+            >
+              <PackageCheck className="w-3.5 h-3.5 text-blue-400" />
+              <span>My Orders</span>
+              {pendingOrActiveCount > 0 && (
+                <span className="bg-rose-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-bold">
+                  {pendingOrActiveCount}
+                </span>
+              )}
+            </button>
+          )}
+
           {/* Place Order CTA */}
           <button
             id="header-place-order-cta"
