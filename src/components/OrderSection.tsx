@@ -31,7 +31,8 @@ import {
   Trash2,
   Sliders,
   CheckCheck,
-  Info
+  Info,
+  Lock
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { useCMS } from '../context/CMSContext';
@@ -341,6 +342,12 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
     e.preventDefault();
     setSubmissionError(null);
 
+    if (!isAuthenticated) {
+      setSubmissionError('অর্ডার কনফার্ম করার জন্য আপনার অ্যাকাউন্ট ও পাসওয়ার্ড দিয়ে লগইন করা আবশ্যক। অনুগ্রহ করে সাইন ইন করুন অথবা নতুন অ্যাকাউন্ট তৈরি করুন।');
+      openAuthModal();
+      return;
+    }
+
     if (!clientName.trim()) {
       setSubmissionError('Please enter your full name');
       return;
@@ -367,20 +374,6 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
     setIsSubmitting(true);
 
     try {
-      // Auto-authenticate client with their entered credentials if not already logged in
-      if (!isAuthenticated) {
-        try {
-          await loginWithGoogle(
-            clientEmail.trim(),
-            clientName.trim(),
-            undefined,
-            clientPhone.trim()
-          );
-        } catch (authErr) {
-          console.warn('Auto client registration notice:', authErr);
-        }
-      }
-
       const finalServices: ServiceType[] = derivedServicesList.length > 0 
         ? derivedServicesList 
         : ['Graphic Design'];
@@ -574,18 +567,19 @@ export const OrderSection: React.FC<OrderSectionProps> = ({
                         <ShieldAlert className="w-5 h-5" />
                       </div>
                       <div>
-                        <h4 className="text-xs sm:text-sm font-bold text-white">Client Account Required to Submit Order</h4>
+                        <h4 className="text-xs sm:text-sm font-bold text-white">অ্যাকাউন্ট ও পাসওয়ার্ড আবশ্যক (Account Required)</h4>
                         <p className="text-[11px] sm:text-xs text-neutral-300 mt-0.5">
-                          Please log in with Google to secure your order and view live delivery updates in your client portal.
+                          নিরাপদ অর্ডার এবং ক্লায়েন্ট প্যানেলে লাইভ ডেলিভারি ফাইল পেতে অনুগ্রহ করে সাইন ইন করুন অথবা পাসওয়ার্ড দিয়ে নতুন অ্যাকাউন্ট তৈরি করুন।
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={openAuthModal}
-                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider shrink-0 cursor-pointer shadow-md shadow-rose-600/30 transition-all w-full sm:w-auto text-center"
+                      className="px-5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider shrink-0 cursor-pointer shadow-md shadow-rose-600/30 transition-all w-full sm:w-auto text-center flex items-center justify-center gap-1.5"
                     >
-                      Sign In with Google
+                      <Lock className="w-3.5 h-3.5" />
+                      <span>লগইন / নতুন অ্যাকাউন্ট তৈরি করুন</span>
                     </button>
                   </div>
                 )}

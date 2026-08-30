@@ -45,9 +45,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   // Audio chime synthesis for new incoming orders
   const playOrderChime = () => {
     try {
+      if (typeof window === 'undefined') return;
       const AudioContextClass = window.AudioContext || (window as any).webkitAudioContext;
-      if (!AudioContextClass) return;
+      if (!AudioContextClass || typeof AudioContextClass !== 'function') return;
       const ctx = new AudioContextClass();
+      if (!ctx || !ctx.createOscillator || !ctx.createGain) return;
       const now = ctx.currentTime;
       
       const osc = ctx.createOscillator();
@@ -65,7 +67,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       osc.start(now);
       osc.stop(now + 0.9);
     } catch (e) {
-      // Audio autoplay policy catch
+      // Audio autoplay or sandbox policy catch
     }
   };
 

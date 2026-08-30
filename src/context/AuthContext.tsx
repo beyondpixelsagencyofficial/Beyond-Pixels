@@ -11,6 +11,8 @@ interface AuthContextType {
   isAuthModalOpen: boolean;
   openAuthModal: () => void;
   closeAuthModal: () => void;
+  login: (email: string, password: string) => Promise<User>;
+  register: (name: string, email: string, phone: string, password: string, company?: string) => Promise<User>;
   loginWithGoogle: (email: string, name?: string, avatar?: string, phone?: string) => Promise<User>;
   logout: () => void;
   updateProfile: (data: { name?: string; phone?: string; company?: string; avatar?: string }) => Promise<void>;
@@ -45,6 +47,69 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
+  // Standard Login with Email and Password
+  const login = async (email: string, password: string): Promise<User> => {
+    const normalizedEmail = email.trim().toLowerCase();
+    
+    const res = await fetch('/api/auth/login', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: normalizedEmail, password })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success || !data.user) {
+      throw new Error(data.error || 'লগইন ব্যর্থ হয়েছে। অনুগ্রহ করে সঠিক তথ্য দিন।');
+    }
+
+    const authenticatedUser: User = {
+      ...data.user,
+      role: data.user.role || (normalizedEmail === ADMIN_EMAIL.toLowerCase() ? 'admin' : 'client')
+    };
+
+    setUser(authenticatedUser);
+    closeAuthModal();
+    return authenticatedUser;
+  };
+
+  // Sign Up / Register New Client Account
+  const register = async (
+    name: string, 
+    email: string, 
+    phone: string, 
+    password: string, 
+    company?: string
+  ): Promise<User> => {
+    const normalizedEmail = email.trim().toLowerCase();
+
+    const res = await fetch('/api/auth/register', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: name.trim(),
+        email: normalizedEmail,
+        phone: phone.trim(),
+        password,
+        company: company?.trim() || ''
+      })
+    });
+
+    const data = await res.json();
+    if (!res.ok || !data.success || !data.user) {
+      throw new Error(data.error || 'অ্যাকাউন্ট রেজিস্ট্রেশন সম্পন্ন করা সম্ভব হয়নি।');
+    }
+
+    const registeredUser: User = {
+      ...data.user,
+      role: 'client' // Strictly client
+    };
+
+    setUser(registeredUser);
+    closeAuthModal();
+    return registeredUser;
+  };
+
+  // Compatibility method
   const loginWithGoogle = async (
     email: string, 
     name?: string, 
@@ -204,7 +269,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return [];
   };
 
-  const isAdmin = user?.role === 'admin' || user?.email.toLowerCase() === ADMIN_EMAIL.toLowerCase();
+  const isAdmin = !!user && user.email.toLowerCase() === ADMIN_EMAIL.toLowerCase() && user.role === 'admin';
 
   return (
     <AuthContext.Provider
@@ -215,6 +280,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         isAuthModalOpen,
         openAuthModal,
         closeAuthModal,
+        login,
+        register,
         loginWithGoogle,
         logout,
         updateProfile,

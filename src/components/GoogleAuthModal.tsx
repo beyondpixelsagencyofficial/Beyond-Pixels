@@ -1,39 +1,112 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Lock, Sparkles, LogIn, ArrowRight, ShieldCheck, Mail } from 'lucide-react';
-import { useAuth, ADMIN_EMAIL } from '../context/AuthContext';
+import { X, Lock, Eye, EyeOff, LogIn, UserPlus, AlertCircle, CheckCircle2, ArrowRight } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 interface GoogleAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSuccess?: () => void;
+  initialMode?: 'login' | 'register';
 }
 
-export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClose, onSuccess }) => {
-  const { loginWithGoogle } = useAuth();
+export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ 
+  isOpen, 
+  onClose, 
+  onSuccess,
+  initialMode = 'login'
+}) => {
+  const { login, register } = useAuth();
+  
+  const [mode, setMode] = useState<'login' | 'register'>(initialMode);
+  
+  // Form fields
   const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
+  const [company, setCompany] = useState('');
+  
+  // UI states
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
 
   if (!isOpen) return null;
 
+  const resetForm = () => {
+    setEmail('');
+    setPassword('');
+    setConfirmPassword('');
+    setName('');
+    setPhone('');
+    setCompany('');
+    setError(null);
+    setSuccessMsg(null);
+  };
+
+  const handleModeSwitch = (newMode: 'login' | 'register') => {
+    setMode(newMode);
+    setError(null);
+    setSuccessMsg(null);
+  };
+
+  // Submit Handler
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!email || !email.includes('@')) {
-      setError('Please enter a valid Google email address');
+    setError(null);
+    setSuccessMsg(null);
+
+    const cleanEmail = email.trim().toLowerCase();
+    if (!cleanEmail || !cleanEmail.includes('@')) {
+      setError('একটি সঠিক ইমেইল অ্যাড্রেস প্রদান করুন (Valid Email is required)');
       return;
     }
 
+    if (!password) {
+      setError('অনুগ্রহ করে আপনার পাসওয়ার্ড প্রদান করুন');
+      return;
+    }
+
+    if (mode === 'register') {
+      if (!name.trim()) {
+        setError('আপনার পুরো নাম প্রদান করুন (Full Name is required)');
+        return;
+      }
+      if (!phone.trim()) {
+        setError('আপনার সচল হোয়াটসঅ্যাপ বা মোবাইল নম্বর প্রদান করুন');
+        return;
+      }
+      if (password.length < 4) {
+        setError('পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে');
+        return;
+      }
+      if (password !== confirmPassword) {
+        setError('পাসওয়ার্ড দুটি মেলেনি! নিশ্চিতকরণ পাসওয়ার্ড পুনরায় চেক করুন');
+        return;
+      }
+    }
+
     setLoading(true);
-    setError(null);
+
     try {
-      await loginWithGoogle(email.trim(), name.trim() || undefined, undefined, phone.trim() || undefined);
-      if (onSuccess) onSuccess();
-      onClose();
-    } catch (e: any) {
-      setError(e.message || 'Failed to authenticate with Google');
+      if (mode === 'login') {
+        await login(cleanEmail, password);
+        if (onSuccess) onSuccess();
+        onClose();
+      } else {
+        await register(name.trim(), cleanEmail, phone.trim(), password, company.trim() || undefined);
+        setSuccessMsg('অ্যাকাউন্ট সফলভাবে তৈরি হয়েছে!');
+        setTimeout(() => {
+          if (onSuccess) onSuccess();
+          onClose();
+        }, 500);
+      }
+    } catch (err: any) {
+      setError(err.message || 'অনুরোধটি প্রক্রিয়া করা সম্ভব হয়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
     } finally {
       setLoading(false);
     }
@@ -72,127 +145,73 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
             <X className="w-5 h-5" />
           </button>
 
-          {/* Header with Google Logo */}
+          {/* Header Brand */}
           <div className="text-center mb-6">
-            <div className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-neutral-900 border border-neutral-800 mb-3 shadow-inner">
-              <svg className="w-7 h-7" viewBox="0 0 24 24">
-                <path
-                  fill="#4285F4"
-                  d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-                />
-                <path
-                  fill="#34A853"
-                  d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-                />
-                <path
-                  fill="#FBBC05"
-                  d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-                />
-                <path
-                  fill="#EA4335"
-                  d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-                />
-              </svg>
+            <div className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-gradient-to-tr from-rose-600 to-rose-400 mb-3 shadow-lg shadow-rose-600/30">
+              <Lock className="w-5 h-5 text-white" />
             </div>
-            <h2 className="text-xl font-black tracking-tight text-white">Sign In with Google</h2>
-            <p className="text-xs text-neutral-400 mt-1.5 leading-relaxed">
-              Login to access your client order portal, live delivery files, and workspace.
+            <h2 className="text-2xl font-black tracking-tight text-white">
+              {mode === 'login' ? 'সাইন ইন / লগইন' : 'নতুন অ্যাকাউন্ট তৈরি করুন'}
+            </h2>
+            <p className="text-xs text-neutral-400 mt-1">
+              {mode === 'login' 
+                ? 'আপনার ইমেইল ও পাসওয়ার্ড দিয়ে অ্যাকাউন্টে প্রবেশ করুন' 
+                : 'অর্ডার এবং সার্ভিস এক্সেস পেতে আপনার তথ্য দিয়ে অ্যাকাউন্ট তৈরি করুন'}
             </p>
           </div>
 
-          {/* Quick 1-Click Login Options */}
-          <div className="mb-5 space-y-2">
-            <p className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">
-              Quick Login / Fast Access:
-            </p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={async () => {
-                  setLoading(true);
-                  try {
-                    await loginWithGoogle(
-                      ADMIN_EMAIL,
-                      'Beyond Pixels Admin',
-                      undefined,
-                      '+8801965407715'
-                    );
-                    if (onSuccess) onSuccess();
-                    onClose();
-                  } catch (e: any) {
-                    setError(e.message || 'Login failed');
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="p-3 rounded-2xl bg-rose-600/15 hover:bg-rose-600/25 border border-rose-500/30 text-left transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-rose-300 group-hover:text-rose-200">👑 Master Admin</span>
-                  <span className="text-[10px] bg-rose-600 text-white px-1.5 py-0.5 rounded font-extrabold">All Rights</span>
-                </div>
-                <div className="text-[10px] text-neutral-400 truncate mt-0.5">{ADMIN_EMAIL}</div>
-              </button>
-
-              <button
-                type="button"
-                onClick={async () => {
-                  setLoading(true);
-                  try {
-                    await loginWithGoogle(
-                      'client.preview@gmail.com',
-                      'Rafid Hossain',
-                      undefined,
-                      '+8801712345678'
-                    );
-                    if (onSuccess) onSuccess();
-                    onClose();
-                  } catch (e: any) {
-                    setError(e.message || 'Login failed');
-                  } finally {
-                    setLoading(false);
-                  }
-                }}
-                className="p-3 rounded-2xl bg-blue-600/15 hover:bg-blue-600/25 border border-blue-500/30 text-left transition-all cursor-pointer group"
-              >
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-blue-300 group-hover:text-blue-200">👤 Client Portal</span>
-                  <span className="text-[10px] bg-blue-600 text-white px-1.5 py-0.5 rounded font-extrabold">Demo</span>
-                </div>
-                <div className="text-[10px] text-neutral-400 truncate mt-0.5">client.preview@gmail.com</div>
-              </button>
-            </div>
-            
-            <div className="relative my-4">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-neutral-800" />
-              </div>
-              <div className="relative flex justify-center text-xs">
-                <span className="px-3 bg-[#0D0D0D] text-neutral-500 font-semibold text-[10px] uppercase">
-                  Or enter your Google Email
-                </span>
-              </div>
-            </div>
+          {/* Mode Switcher Tabs */}
+          <div className="flex rounded-xl bg-[#151515] p-1 border border-neutral-800 mb-6">
+            <button
+              id="auth-tab-signin"
+              type="button"
+              onClick={() => handleModeSwitch('login')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === 'login'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>সাইন ইন (Sign In)</span>
+            </button>
+            <button
+              id="auth-tab-signup"
+              type="button"
+              onClick={() => handleModeSwitch('register')}
+              className={`flex-1 py-2 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                mode === 'register'
+                  ? 'bg-rose-600 text-white shadow-md'
+                  : 'text-neutral-400 hover:text-neutral-200'
+              }`}
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>সাইন আপ (Sign Up)</span>
+            </button>
           </div>
 
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                Full Name <span className="text-neutral-500 font-normal">(Optional)</span>
-              </label>
-              <input
-                id="auth-name-input"
-                type="text"
-                placeholder="e.g. David Miller"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
-              />
-            </div>
+          {/* Form */}
+          <form onSubmit={handleSubmit} className="space-y-3.5">
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  আপনার নাম (Full Name) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="auth-name-input"
+                  type="text"
+                  required
+                  placeholder="আপনার সম্পূর্ণ নাম"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#151515] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
+                />
+              </div>
+            )}
 
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                Google Email Address <span className="text-rose-500">*</span>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                ইমেইল অ্যাড্রেস (Email Address) <span className="text-rose-500">*</span>
               </label>
               <input
                 id="auth-email-input"
@@ -201,54 +220,159 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({ isOpen, onClos
                 placeholder="yourname@gmail.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
+                className="w-full px-3.5 py-2.5 rounded-xl bg-[#151515] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
               />
             </div>
+
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  মোবাইল / হোয়াটসঅ্যাপ নম্বর (WhatsApp/Phone) <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  id="auth-phone-input"
+                  type="tel"
+                  required
+                  placeholder="01700-000000"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#151515] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
+                />
+              </div>
+            )}
+
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  কোম্পানি / ব্র্যান্ডের নাম <span className="text-neutral-500 font-normal">(ঐচ্ছিক)</span>
+                </label>
+                <input
+                  id="auth-company-input"
+                  type="text"
+                  placeholder="e.g. My Brand Ltd."
+                  value={company}
+                  onChange={(e) => setCompany(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#151515] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
+                />
+              </div>
+            )}
 
             <div>
-              <label className="block text-xs font-semibold text-neutral-300 mb-1.5">
-                WhatsApp / Phone Number <span className="text-neutral-500 font-normal">(Optional)</span>
+              <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                পাসওয়ার্ড (Password) <span className="text-rose-500">*</span>
               </label>
-              <input
-                id="auth-phone-input"
-                type="tel"
-                placeholder="+880 1700-000000"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors"
-              />
+              <div className="relative">
+                <input
+                  id="auth-password-input"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  placeholder={mode === 'register' ? 'কমপক্ষে ৪ অক্ষরের পাসওয়ার্ড দিন' : 'আপনার পাসওয়ার্ড লিখুন'}
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full px-3.5 py-2.5 rounded-xl bg-[#151515] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors pr-10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
             </div>
 
+            {mode === 'register' && (
+              <div>
+                <label className="block text-xs font-semibold text-neutral-300 mb-1">
+                  পাসওয়ার্ড নিশ্চিত করুন (Confirm Password) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    id="auth-confirm-password-input"
+                    type={showConfirmPassword ? 'text' : 'password'}
+                    required
+                    placeholder="পাসওয়ার্ড পুনরায় লিখুন"
+                    value={confirmPassword}
+                    onChange={(e) => setConfirmPassword(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#151515] border border-neutral-800 text-white placeholder-neutral-500 focus:outline-none focus:border-rose-500 text-xs transition-colors pr-10"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition-colors cursor-pointer"
+                  >
+                    {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {error && (
-              <div className="p-2.5 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs">
-                {error}
+              <div className="p-3 rounded-xl bg-rose-500/15 border border-rose-500/30 text-rose-400 text-xs flex items-start gap-2">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{error}</span>
+              </div>
+            )}
+
+            {successMsg && (
+              <div className="p-3 rounded-xl bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 text-xs flex items-center gap-2">
+                <CheckCircle2 className="w-4 h-4 shrink-0" />
+                <span>{successMsg}</span>
               </div>
             )}
 
             <button
               id="submit-auth-btn"
               type="submit"
-              disabled={loading || !email}
-              className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/20 cursor-pointer disabled:opacity-50 mt-2"
+              disabled={loading}
+              className="w-full py-3 px-4 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider transition-all flex items-center justify-center gap-2 shadow-lg shadow-rose-600/25 cursor-pointer disabled:opacity-50 mt-4"
             >
               {loading ? (
-                <span>Connecting Account...</span>
+                <span>যাচাই করা হচ্ছে...</span>
               ) : (
                 <>
-                  <span>Continue with Google</span>
+                  <span>{mode === 'login' ? 'লগইন করুন (Sign In)' : 'অ্যাকাউন্ট তৈরি করুন (Create Account)'}</span>
                   <ArrowRight className="w-3.5 h-3.5" />
                 </>
               )}
             </button>
           </form>
 
-          {/* Security & Verification Notice */}
-          <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-between text-[11px] text-neutral-500">
+          {/* Switch Prompt */}
+          <div className="mt-4 text-center">
+            {mode === 'login' ? (
+              <p className="text-xs text-neutral-400">
+                অ্যাকাউন্ট নেই?{' '}
+                <button
+                  id="switch-to-signup-btn"
+                  type="button"
+                  onClick={() => handleModeSwitch('register')}
+                  className="text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer"
+                >
+                  নতুন অ্যাকাউন্ট তৈরি করুন
+                </button>
+              </p>
+            ) : (
+              <p className="text-xs text-neutral-400">
+                ইতিমধ্যে অ্যাকাউন্ট আছে?{' '}
+                <button
+                  id="switch-to-signin-btn"
+                  type="button"
+                  onClick={() => handleModeSwitch('login')}
+                  className="text-rose-400 hover:text-rose-300 font-bold underline cursor-pointer"
+                >
+                  সাইন ইন করুন
+                </button>
+              </p>
+            )}
+          </div>
+
+          {/* Security Notice */}
+          <div className="mt-6 pt-4 border-t border-neutral-800/80 flex items-center justify-center text-[11px] text-neutral-500">
             <span className="flex items-center gap-1.5">
               <Lock className="w-3 h-3 text-rose-500" />
-              Secure 256-Bit Authentication
+              Secure 256-Bit Encrypted Authentication
             </span>
-            <span className="text-neutral-500">Google OAuth Verified</span>
           </div>
         </motion.div>
       </div>

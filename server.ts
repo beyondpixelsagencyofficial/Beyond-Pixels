@@ -231,19 +231,24 @@ interface ServerUser {
   phone?: string;
   avatar?: string;
   company?: string;
+  password?: string;
   role: 'admin' | 'client';
   createdAt: string;
   lastLoginAt: string;
 }
 
+const ADMIN_EMAIL = 'beyondpixelsagency.official@gmail.com';
+const ADMIN_MASTER_PASSWORD = 'BeyondAdmin@2026';
+
 const INITIAL_USERS: ServerUser[] = [
   {
     id: "usr_admin",
     name: "Beyond Pixels Admin",
-    email: "beyondpixelsagency.official@gmail.com",
+    email: ADMIN_EMAIL,
     avatar: "https://api.dicebear.com/7.x/initials/svg?seed=BP&backgroundColor=e11d48",
     phone: "+8801613253301",
     company: "Beyond Pixels Agency",
+    password: ADMIN_MASTER_PASSWORD,
     role: "admin",
     createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
     lastLoginAt: new Date().toISOString()
@@ -903,6 +908,223 @@ app.get('/api/users', async (req: Request, res: Response) => {
   });
 
   res.json(enrichedUsers);
+});
+
+// POST Auth: Sign In / Login with Email & Password
+app.post('/api/auth/login', async (req: Request, res: Response) => {
+  try {
+    const { email, password } = req.body;
+    if (!email || !email.includes('@') || !password) {
+      return res.status(400).json({ error: 'ইমেইল এবং পাসওয়ার্ড উভয়ই প্রদান করা আবশ্যক।' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+    const isAdmin = normalizedEmail === ADMIN_EMAIL.toLowerCase();
+
+    // 1. MASTER ADMIN LOGIN
+    if (isAdmin) {
+      if (password !== ADMIN_MASTER_PASSWORD) {
+        return res.status(401).json({ error: 'ভুল পাসওয়ার্ড! অ্যাডমিনের সঠিক পাসওয়ার্ড প্রদান করুন।' });
+      }
+
+      let adminUser = usersData.find(u => u.email.toLowerCase() === ADMIN_EMAIL.toLowerCase());
+      const now = new Date().toISOString();
+
+      if (!adminUser) {
+        adminUser = {
+          id: 'usr_admin',
+          name: 'Beyond Pixels Admin',
+          email: ADMIN_EMAIL,
+          avatar: 'https://api.dicebear.com/7.x/initials/svg?seed=BP&backgroundColor=e11d48',
+          phone: '+8801613253301',
+          company: 'Beyond Pixels Agency',
+          password: ADMIN_MASTER_PASSWORD,
+          role: 'admin',
+          createdAt: now,
+          lastLoginAt: now
+        };
+        usersData.unshift(adminUser);
+      } else {
+        adminUser.role = 'admin';
+        adminUser.lastLoginAt = now;
+      }
+
+      saveData(USERS_FILE, usersData);
+      pushUserToSupabase(adminUser);
+
+      return res.json({
+        success: true,
+        user: {
+          id: adminUser.id,
+          name: adminUser.name,
+          email: adminUser.email,
+          phone: adminUser.phone,
+          avatar: adminUser.avatar,
+          company: adminUser.company,
+          role: 'admin',
+          createdAt: adminUser.createdAt,
+          lastLoginAt: adminUser.lastLoginAt
+        }
+      });
+    }
+
+    // 2. STANDARD CLIENT LOGIN
+    let clientUser = usersData.find(u => u.email.toLowerCase() === normalizedEmail);
+
+    // If not in local cache, check Supabase
+    if (!clientUser) {
+      try {
+        const { data: remoteUser } = await supabase
+          .from('users')
+          .select('*')
+          .eq('email', normalizedEmail)
+          .maybeSingle();
+
+        if (remoteUser) {
+          const rawData = remoteUser.data || {};
+          clientUser = {
+            id: remoteUser.id || rawData.id || `usr_${Date.now()}`,
+            email: normalizedEmail,
+            name: remoteUser.name || rawData.name || normalizedEmail.split('@')[0],
+            phone: remoteUser.phone || rawData.phone || '',
+            avatar: remoteUser.avatar || rawData.avatar,
+            company: remoteUser.company || rawData.company || '',
+            password: rawData.password || remoteUser.password,
+            role: 'client',
+            createdAt: remoteUser.created_at || rawData.createdAt || new Date().toISOString(),
+            lastLoginAt: new Date().toISOString()
+          };
+          usersData.push(clientUser);
+          saveData(USERS_FILE, usersData);
+        }
+      } catch (sbErr) {
+        console.warn('Supabase login user lookup notice:', sbErr);
+      }
+    }
+
+    if (!clientUser) {
+      return res.status(404).json({ 
+        error: 'এই ইমেইল দিয়ে কোনো অ্যাকাউন্ট পাওয়া যায়নি। অনুগ্রহ করে "Create Account" ট্যাবে গিয়ে নতুন অ্যাকাউন্ট তৈরি করুন।' 
+      });
+    }
+
+    if (clientUser.password && clientUser.password !== password) {
+      return res.status(401).json({ error: 'ভুল পাসওয়ার্ড! অনুগ্রহ করে আপনার সঠিক পাসওয়ার্ডটি দিন।' });
+    }
+
+    // If client was previously registered without password, set it now
+    if (!clientUser.password) {
+      clientUser.password = password;
+    }
+
+    clientUser.role = 'client'; // Strictly client role
+    clientUser.lastLoginAt = new Date().toISOString();
+    saveData(USERS_FILE, usersData);
+    pushUserToSupabase(clientUser);
+
+    const userOrders = ordersData.filter(o => o.clientEmail.toLowerCase() === normalizedEmail);
+    const totalSpent = userOrders
+      .filter(o => o.status !== 'Rejected')
+      .reduce((sum, o) => sum + (o.estimatedTotalBDT || (o as any).estimatedTotal || 0), 0);
+
+    return res.json({
+      success: true,
+      user: {
+        id: clientUser.id,
+        name: clientUser.name,
+        email: clientUser.email,
+        phone: clientUser.phone,
+        avatar: clientUser.avatar,
+        company: clientUser.company,
+        role: 'client',
+        createdAt: clientUser.createdAt,
+        lastLoginAt: clientUser.lastLoginAt,
+        ordersCount: userOrders.length,
+        totalSpentBDT: totalSpent
+      }
+    });
+  } catch (err: any) {
+    console.error('Error in /api/auth/login:', err);
+    return res.status(500).json({ error: err.message || 'Login failed. Please try again.' });
+  }
+});
+
+// POST Auth: Sign Up / Register New Client Account
+app.post('/api/auth/register', async (req: Request, res: Response) => {
+  try {
+    const { name, email, phone, password, company } = req.body;
+
+    if (!name || !name.trim()) {
+      return res.status(400).json({ error: 'আপনার পুরো নাম প্রদান করুন।' });
+    }
+    if (!email || !email.includes('@')) {
+      return res.status(400).json({ error: 'একটি সঠিক ইমেইল অ্যাড্রেস প্রদান করুন।' });
+    }
+    if (!phone || !phone.trim()) {
+      return res.status(400).json({ error: 'আপনার সচল হোয়াটসঅ্যাপ / মোবাইল নম্বর দিন।' });
+    }
+    if (!password || password.length < 4) {
+      return res.status(400).json({ error: 'পাসওয়ার্ড কমপক্ষে ৪ অক্ষরের হতে হবে।' });
+    }
+
+    const normalizedEmail = email.trim().toLowerCase();
+
+    // Prevent regular registration under master admin email
+    if (normalizedEmail === ADMIN_EMAIL.toLowerCase()) {
+      return res.status(400).json({ 
+        error: 'মাস্টার অ্যাডমিন অ্যাকাউন্ট ইতিমধ্যে সংরক্ষিত। অনুগ্রহ করে "Sign In" ট্যাবে মাস্টার পাসওয়ার্ড দিয়ে প্রবেশ করুন।' 
+      });
+    }
+
+    // Check if account already exists
+    const existing = usersData.find(u => u.email.toLowerCase() === normalizedEmail);
+    if (existing) {
+      return res.status(400).json({ 
+        error: 'এই ইমেইল দিয়ে ইতিমধ্যে একটি অ্যাকাউন্ট তৈরি রয়েছে। অনুগ্রহ করে "Sign In" ট্যাবে গিয়ে পাসওয়ার্ড দিয়ে লগইন করুন।' 
+      });
+    }
+
+    const now = new Date().toISOString();
+    const displayName = name.trim();
+    const userAvatar = `https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(displayName)}&backgroundColor=0ea5e9,6366f1,10b981`;
+
+    const newClient: ServerUser = {
+      id: `usr_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+      name: displayName,
+      email: normalizedEmail,
+      phone: phone.trim(),
+      company: company?.trim() || '',
+      password: password,
+      avatar: userAvatar,
+      role: 'client', // STRICTLY CLIENT
+      createdAt: now,
+      lastLoginAt: now
+    };
+
+    usersData.unshift(newClient);
+    saveData(USERS_FILE, usersData);
+    await pushUserToSupabase(newClient);
+
+    return res.status(201).json({
+      success: true,
+      user: {
+        id: newClient.id,
+        name: newClient.name,
+        email: newClient.email,
+        phone: newClient.phone,
+        avatar: newClient.avatar,
+        company: newClient.company,
+        role: 'client',
+        createdAt: newClient.createdAt,
+        lastLoginAt: newClient.lastLoginAt,
+        ordersCount: 0,
+        totalSpentBDT: 0
+      }
+    });
+  } catch (err: any) {
+    console.error('Error in /api/auth/register:', err);
+    return res.status(500).json({ error: err.message || 'Registration failed. Please try again.' });
+  }
 });
 
 // POST Auth Sync (User Login or Register)
