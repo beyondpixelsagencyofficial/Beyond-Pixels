@@ -15,10 +15,9 @@ import {
   DollarSign,
   Receipt
 } from 'lucide-react';
-import jsPDF from 'jspdf';
-import html2canvas from 'html2canvas';
 import { Order } from '../types';
 import { useCMS } from '../context/CMSContext';
+import { downloadInvoicePDF } from '../utils/pdfGenerator';
 
 interface InvoiceModalProps {
   isOpen: boolean;
@@ -34,6 +33,7 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const { cms } = useCMS();
   const invoiceRef = useRef<HTMLDivElement>(null);
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [downloadSuccess, setDownloadSuccess] = useState(false);
 
   if (!isOpen || !order) return null;
 
@@ -48,30 +48,21 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
   const remainingDue = Math.max(0, order.estimatedTotalBDT - order.advanceAmountBDT);
 
   const handleDownloadPDF = async () => {
-    if (!invoiceRef.current) return;
     setIsGeneratingPDF(true);
+    setDownloadSuccess(false);
 
     try {
-      // Temporarily ensure background colors render well
-      const canvas = await html2canvas(invoiceRef.current, {
-        scale: 2,
-        useCORS: true,
-        backgroundColor: '#FFFFFF',
-        logging: false
+      const ok = await downloadInvoicePDF({
+        element: invoiceRef.current,
+        order,
+        agencyEmail,
+        agencyWhatsApp
       });
 
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: 'a4'
-      });
-
-      const pdfWidth = pdf.internal.pageSize.getWidth();
-      const pdfHeight = (canvas.height * pdfWidth) / canvas.width;
-
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
-      pdf.save(`BeyondPixels_Invoice_${order.id}.pdf`);
+      if (ok) {
+        setDownloadSuccess(true);
+        setTimeout(() => setDownloadSuccess(false), 4000);
+      }
     } catch (error) {
       console.error('Error generating PDF:', error);
     } finally {
@@ -115,10 +106,23 @@ export const InvoiceModal: React.FC<InvoiceModalProps> = ({
             <button
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
-              className="px-4 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-md shadow-rose-600/30"
+              className={`px-4 py-1.5 rounded-xl text-white text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer disabled:opacity-60 shadow-md ${
+                downloadSuccess 
+                  ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-600/30' 
+                  : 'bg-rose-600 hover:bg-rose-500 shadow-rose-600/30'
+              }`}
             >
-              <Download className="w-3.5 h-3.5" />
-              <span>{isGeneratingPDF ? 'Generating PDF...' : 'Download PDF Invoice'}</span>
+              {downloadSuccess ? (
+                <>
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>PDF Downloaded!</span>
+                </>
+              ) : (
+                <>
+                  <Download className="w-3.5 h-3.5" />
+                  <span>{isGeneratingPDF ? 'Generating PDF...' : 'Download PDF Invoice'}</span>
+                </>
+              )}
             </button>
 
             <button

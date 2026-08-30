@@ -11,6 +11,7 @@ interface OrderContextType {
   messages: ContactMessage[];
   createOrder: (orderData: Partial<Order>) => Promise<{ success: boolean; order?: Order; error?: string }>;
   seedDemoOrder: () => Promise<{ success: boolean; order?: Order }>;
+  clearAllDemoOrders: () => Promise<void>;
   updateOrderStatus: (orderId: string, status: OrderStatus, adminNotes?: string) => Promise<boolean>;
   addDelivery: (orderId: string, delivery: Omit<DeliveryRelease, 'id' | 'addedAt'>) => Promise<boolean>;
   deleteOrder: (orderId: string) => Promise<boolean>;
@@ -23,13 +24,50 @@ interface OrderContextType {
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
 
-const ORDERS_CACHE_KEY = 'beyond_pixels_cached_orders';
+const ORDERS_CACHE_KEY = 'beyond_pixels_orders_prod_v1';
+
+const DEMO_ORDER_IDS = ['BP-8421', 'BP-7392', 'BP-9150', 'BP-6028', 'BP-9281'];
+const DEMO_EMAILS = [
+  'tahmid.creative@gmail.com',
+  'rafi.ahmed.bd@gmail.com',
+  'farhana.ventures@outlook.com',
+  'shahriar.techbd@gmail.com',
+  'tanvir.foodhub@gmail.com',
+  'shakil.ecommerce@gmail.com',
+  'tanvir.digital@gmail.com',
+  'sabbir.creatives@gmail.com'
+];
+
+const isDemoOrder = (o: any): boolean => {
+  if (!o) return true;
+  if (o.id && DEMO_ORDER_IDS.includes(o.id)) return true;
+  if (o.clientEmail && DEMO_EMAILS.includes(o.clientEmail.toLowerCase().trim())) return true;
+  return false;
+};
+
+async function safeJson(response: Response): Promise<any> {
+  try {
+    const text = await response.text();
+    if (!text || text.trim() === '') return null;
+    return JSON.parse(text);
+  } catch {
+    return null;
+  }
+}
 
 export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [orders, setOrders] = useState<Order[]>(() => {
     try {
+      // Clear legacy demo cache keys
+      localStorage.removeItem('bp_orders_v2');
+      localStorage.removeItem('beyond_pixels_cached_orders');
       const cached = localStorage.getItem(ORDERS_CACHE_KEY);
-      if (cached) return JSON.parse(cached);
+      if (cached) {
+        const parsed = JSON.parse(cached);
+        if (Array.isArray(parsed)) {
+          return parsed.filter(o => !isDemoOrder(o));
+        }
+      }
     } catch (e) {
       console.warn('Error reading cached orders:', e);
     }
@@ -127,12 +165,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           'x-user-email': user?.email || (isAdmin ? 'beyondpixelsagency.official@gmail.com' : '')
         }
       });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
+      if (res.ok) {
+        const data = await safeJson(res);
         if (Array.isArray(data)) {
           data.forEach((o: Order) => {
-            if (o && o.id && o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com') {
+            if (o && o.id && !isDemoOrder(o)) {
               orderMap.set(o.id, o);
             }
           });
@@ -152,7 +189,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       if (!sbErr && sbOrders && sbOrders.length > 0) {
         sbOrders
           .map(mapSupabaseOrderRow)
-          .filter(o => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com')
+          .filter(o => !isDemoOrder(o))
           .forEach((o: Order) => {
             if (!orderMap.has(o.id)) {
               orderMap.set(o.id, o);
@@ -170,9 +207,11 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       console.warn('Supabase direct orders fetch notice:', sbErr);
     }
 
-    const mergedList = Array.from(orderMap.values()).sort((a, b) => 
-      new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-    );
+    const mergedList = Array.from(orderMap.values())
+      .filter(o => !isDemoOrder(o))
+      .sort((a, b) => 
+        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+      );
 
     // If new orders arrived for Admin, trigger audio chime
     if (isAdmin && prevOrdersCountRef.current !== null && mergedList.length > prevOrdersCountRef.current) {
@@ -195,10 +234,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const res = await fetch('/api/stats', {
         headers: { 'x-user-email': user.email }
       });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setStats(data);
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data) setStats(data);
       }
     } catch (err) {
       console.warn('Error fetching stats:', err);
@@ -211,10 +249,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       const res = await fetch('/api/contact', {
         headers: { 'x-user-email': user.email }
       });
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        setMessages(data);
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (Array.isArray(data)) setMessages(data);
       }
     } catch (err) {
       console.warn('Error fetching messages:', err);
@@ -310,10 +347,9 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         body: JSON.stringify(newOrder)
       });
 
-      const contentType = res.headers.get('content-type') || '';
-      if (res.ok && contentType.includes('application/json')) {
-        const data = await res.json();
-        if (data.order) {
+      if (res.ok) {
+        const data = await safeJson(res);
+        if (data?.order) {
           savedOrder = data.order;
           serverSuccess = true;
         }
@@ -509,6 +545,25 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     return await createOrder(demoOrder);
   };
 
+  const clearAllDemoOrders = async () => {
+    setOrders(prev => prev.filter(o => !isDemoOrder(o)));
+    try {
+      localStorage.setItem(ORDERS_CACHE_KEY, JSON.stringify([]));
+    } catch {}
+    try {
+      await fetch('/api/orders/clear-all', {
+        method: 'POST',
+        headers: {
+          'x-user-email': 'beyondpixelsagency.official@gmail.com'
+        }
+      });
+    } catch {}
+    try {
+      await supabase.from('orders').delete().in('id', DEMO_ORDER_IDS);
+    } catch {}
+    await fetchOrders();
+  };
+
   return (
     <OrderContext.Provider
       value={{
@@ -519,6 +574,7 @@ export const OrderProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         messages,
         createOrder,
         seedDemoOrder,
+        clearAllDemoOrders,
         updateOrderStatus,
         addDelivery,
         deleteOrder,

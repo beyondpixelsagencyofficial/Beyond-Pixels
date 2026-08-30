@@ -189,7 +189,27 @@ const DEFAULT_CMS = {
   ]
 };
 
-// Initial Seed Orders (Clean Slate - starts with 0 orders)
+// Helper to identify and purge obsolete demo orders
+const DEMO_ORDER_IDS = ['BP-8421', 'BP-7392', 'BP-9150', 'BP-6028', 'BP-9281'];
+const DEMO_EMAILS = [
+  'tahmid.creative@gmail.com',
+  'rafi.ahmed.bd@gmail.com',
+  'farhana.ventures@outlook.com',
+  'shahriar.techbd@gmail.com',
+  'tanvir.foodhub@gmail.com',
+  'shakil.ecommerce@gmail.com',
+  'tanvir.digital@gmail.com',
+  'sabbir.creatives@gmail.com'
+];
+
+function isDemoOrder(o: any): boolean {
+  if (!o) return true;
+  if (o.id && DEMO_ORDER_IDS.includes(o.id)) return true;
+  if (o.clientEmail && DEMO_EMAILS.includes(o.clientEmail.toLowerCase().trim())) return true;
+  return false;
+}
+
+// Initial Orders for Beyond Pixels Agency - Cleaned for real production orders
 const INITIAL_ORDERS: any[] = [];
 
 // Data Directory and File Paths for persistence
@@ -252,51 +272,26 @@ const INITIAL_USERS: ServerUser[] = [
     role: "admin",
     createdAt: new Date(Date.now() - 86400000 * 30).toISOString(),
     lastLoginAt: new Date().toISOString()
-  },
-  {
-    id: "usr_client_1",
-    name: "Tanvir Rahman",
-    email: "tanvir.digital@gmail.com",
-    avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Tanvir+Rahman&backgroundColor=0ea5e9",
-    phone: "+8801712345678",
-    company: "Fashion Hub BD",
-    role: "client",
-    createdAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-    lastLoginAt: new Date(Date.now() - 86400000).toISOString()
-  },
-  {
-    id: "usr_client_2",
-    name: "Sabbir Ahmed",
-    email: "sabbir.creatives@gmail.com",
-    avatar: "https://api.dicebear.com/7.x/initials/svg?seed=Sabbir+Ahmed&backgroundColor=6366f1",
-    phone: "+8801898765432",
-    company: "NextGen Electronics",
-    role: "client",
-    createdAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-    lastLoginAt: new Date(Date.now() - 3600000 * 4).toISOString()
   }
 ];
 
 // In-Memory state synced to disk and Supabase
 let cmsData = loadData(CMS_FILE, DEFAULT_CMS);
-let ordersData = loadData(ORDERS_FILE, INITIAL_ORDERS);
-let usersData: ServerUser[] = loadData(USERS_FILE, INITIAL_USERS);
-let messagesData = loadData(MESSAGES_FILE, [
-  {
-    id: "msg_1",
-    name: "Arif Hossain",
-    email: "arif.tech@outlook.com",
-    phone: "+8801755112233",
-    subject: "Custom Enterprise Portal + Video Production",
-    message: "Hi Beyond Pixels team, we are planning a major brand revamp and would love a custom quotation for 10 videos + Web portal.",
-    createdAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-    read: false
-  }
-]);
+let ordersData: any[] = loadData(ORDERS_FILE, []).filter(o => !isDemoOrder(o));
+let usersData: ServerUser[] = loadData(USERS_FILE, INITIAL_USERS).filter(u => u.email === ADMIN_EMAIL || !DEMO_EMAILS.includes(u.email));
+let messagesData = loadData(MESSAGES_FILE, []).filter(m => !DEMO_EMAILS.includes(m.email));
+saveData(ORDERS_FILE, ordersData);
 
 // Supabase Async Synchronization Helpers
 async function syncFromSupabase() {
   try {
+    // Delete any obsolete demo orders from remote Supabase table
+    try {
+      await supabase.from('orders').delete().in('id', DEMO_ORDER_IDS);
+    } catch {
+      // ignore
+    }
+
     // 1. Sync CMS
     const { data: remoteCms, error: cmsErr } = await supabase
       .from('cms')
@@ -317,7 +312,6 @@ async function syncFromSupabase() {
       .order('created_at', { ascending: false });
 
     if (!ordersErr && remoteOrders && remoteOrders.length > 0) {
-      // Filter out any previous dummy seed orders (BP-9281 / tahmid.creative@gmail.com)
       const mappedOrders = remoteOrders
         .map((row: any) => {
           if (row.data && typeof row.data === 'object') {
@@ -346,11 +340,11 @@ async function syncFromSupabase() {
             updatedAt: row.updated_at || row.updatedAt || new Date().toISOString()
           };
         })
-        .filter(o => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
+        .filter((o: any) => !isDemoOrder(o));
 
       ordersData = mappedOrders;
       saveData(ORDERS_FILE, ordersData);
-      console.log(`✅ Supabase: ${ordersData.length} Orders synchronized`);
+      console.log(`✅ Supabase: ${ordersData.length} Live Orders synchronized`);
     }
 
     // 3. Sync Messages
@@ -615,16 +609,16 @@ app.get('/api/orders', async (req: Request, res: Response) => {
             updatedAt: row.updated_at || row.updatedAt || new Date().toISOString()
           };
         })
-        .filter((o: any) => o.id !== 'BP-9281' && o.clientEmail !== 'tahmid.creative@gmail.com');
+        .filter((o: any) => !isDemoOrder(o));
 
       const map = new Map<string, any>();
       // First populate with local server in-memory & disk orders
       ordersData.forEach((o: any) => {
-        if (o && o.id) map.set(o.id, o);
+        if (o && o.id && !isDemoOrder(o)) map.set(o.id, o);
       });
       // Merge with remote Supabase orders without losing local fields
       mappedOrders.forEach((o: any) => {
-        if (o && o.id) {
+        if (o && o.id && !isDemoOrder(o)) {
           if (!map.has(o.id)) {
             map.set(o.id, o);
           } else {
@@ -639,27 +633,51 @@ app.get('/api/orders', async (req: Request, res: Response) => {
           }
         }
       });
-      ordersData = Array.from(map.values()).sort((a: any, b: any) => 
-        new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
-      );
+      ordersData = Array.from(map.values())
+        .filter(o => !isDemoOrder(o))
+        .sort((a: any, b: any) => 
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
       saveData(ORDERS_FILE, ordersData);
     }
   } catch (syncErr) {
     console.warn('Orders on-demand sync notice:', syncErr);
   }
 
+  const cleanOrders = ordersData.filter(o => !isDemoOrder(o));
+
   // Admin access
   if (userEmail === 'beyondpixelsagency.official@gmail.com' || req.query.admin === 'true') {
-    return res.json(ordersData);
+    return res.json(cleanOrders);
   }
 
   // Client access by email
   if (userEmail) {
-    const userOrders = ordersData.filter(o => o.clientEmail && o.clientEmail.toLowerCase().trim() === userEmail);
+    const userOrders = cleanOrders.filter(o => o.clientEmail && o.clientEmail.toLowerCase().trim() === userEmail);
     return res.json(userOrders);
   }
 
   res.json([]);
+});
+
+// POST Clear All Demo Orders (Admin)
+app.post('/api/orders/clear-all', async (req: Request, res: Response) => {
+  const userEmail = (req.headers['x-user-email'] as string || '').toLowerCase().trim();
+  if (userEmail !== 'beyondpixelsagency.official@gmail.com' && req.query.admin !== 'true') {
+    return res.status(403).json({ error: 'Unauthorized' });
+  }
+
+  try {
+    // Delete demo IDs from Supabase
+    await supabase.from('orders').delete().in('id', DEMO_ORDER_IDS);
+  } catch (e) {
+    console.warn('Supabase clear demo orders err:', e);
+  }
+
+  ordersData = ordersData.filter(o => !isDemoOrder(o));
+  saveData(ORDERS_FILE, ordersData);
+
+  res.json({ success: true, message: 'All demo orders removed successfully', remainingOrders: ordersData.length });
 });
 
 // GET Track Order (Public - search by Order ID, TrxID, or Phone Number)

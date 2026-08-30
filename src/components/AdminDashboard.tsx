@@ -26,7 +26,11 @@ import {
   DollarSign,
   Flame,
   BadgeDollarSign,
-  Receipt
+  Receipt,
+  Copy,
+  Check,
+  Eye,
+  PlusCircle
 } from 'lucide-react';
 import { useAuth, ADMIN_EMAIL } from '../context/AuthContext';
 import { useCMS } from '../context/CMSContext';
@@ -47,6 +51,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
     messages, 
     createOrder,
     seedDemoOrder,
+    clearAllDemoOrders,
     updateOrderStatus, 
     addDelivery, 
     deleteOrder, 
@@ -62,6 +67,27 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
   const [usersList, setUsersList] = useState<User[]>([]);
   const [loadingUsers, setLoadingUsers] = useState(false);
   const [selectedInvoiceOrder, setSelectedInvoiceOrder] = useState<Order | null>(null);
+  const [selectedDetailOrder, setSelectedDetailOrder] = useState<Order | null>(null);
+  const [copiedTrxId, setCopiedTrxId] = useState<string | null>(null);
+  const [showCreateOrderModal, setShowCreateOrderModal] = useState(false);
+
+  // New Custom Order Form State
+  const [newOrderClientName, setNewOrderClientName] = useState('');
+  const [newOrderClientEmail, setNewOrderClientEmail] = useState('');
+  const [newOrderClientPhone, setNewOrderClientPhone] = useState('');
+  const [newOrderService, setNewOrderService] = useState('Graphic Design');
+  const [newOrderTotalBDT, setNewOrderTotalBDT] = useState('15000');
+  const [newOrderPaymentMethod, setNewOrderPaymentMethod] = useState<'bKash' | 'Nagad' | 'Bank Transfer'>('bKash');
+  const [newOrderTrxId, setNewOrderTrxId] = useState('');
+  const [newOrderBrief, setNewOrderBrief] = useState('');
+  const [isCreatingCustomOrder, setIsCreatingCustomOrder] = useState(false);
+
+  const handleCopyTrx = (trx: string) => {
+    if (!trx) return;
+    navigator.clipboard.writeText(trx);
+    setCopiedTrxId(trx);
+    setTimeout(() => setCopiedTrxId(null), 2500);
+  };
   
   // Delivery Upload Modal state
   const [deliveryModalOrder, setDeliveryModalOrder] = useState<Order | null>(null);
@@ -174,6 +200,50 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
     );
   };
 
+  const handleCreateCustomOrder = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!newOrderClientName.trim() || !newOrderClientEmail.trim()) {
+      alert('Client name and email are required');
+      return;
+    }
+
+    setIsCreatingCustomOrder(true);
+    try {
+      const totalBDT = Number(newOrderTotalBDT) || 15000;
+      const advanceBDT = Math.round(totalBDT * 0.3);
+      const res = await createOrder({
+        clientName: newOrderClientName.trim(),
+        clientEmail: newOrderClientEmail.trim(),
+        clientPhone: newOrderClientPhone.trim() || '+8801700000000',
+        services: [newOrderService as any],
+        subServices: [],
+        deliveryTimeframe: 'standard',
+        projectDescription: newOrderBrief.trim() || 'Custom registered project sprint.',
+        estimatedTotalBDT: totalBDT,
+        advanceAmountBDT: advanceBDT,
+        paymentMethod: newOrderPaymentMethod,
+        paymentNumber: '01965407715',
+        transactionId: newOrderTrxId.trim().toUpperCase() || `MANUAL-${Date.now().toString().slice(-6)}`,
+        status: 'In Progress',
+        adminNotes: 'Custom client order manually entered via Admin Control Center.'
+      });
+
+      if (res.success && res.order) {
+        setShowCreateOrderModal(false);
+        setNewOrderClientName('');
+        setNewOrderClientEmail('');
+        setNewOrderClientPhone('');
+        setNewOrderTrxId('');
+        setNewOrderBrief('');
+        setSelectedDetailOrder(res.order);
+      }
+    } catch (e) {
+      console.error('Create custom order error:', e);
+    } finally {
+      setIsCreatingCustomOrder(false);
+    }
+  };
+
   const [isManualRefreshing, setIsManualRefreshing] = useState(false);
 
   const handleManualRefresh = async () => {
@@ -249,16 +319,25 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
 
           <div className="flex flex-wrap items-center gap-3">
             <button
+              onClick={() => setShowCreateOrderModal(true)}
+              className="px-3.5 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white text-xs font-bold transition-all cursor-pointer flex items-center gap-2 shadow-lg shadow-rose-600/30"
+              title="Add a custom client order directly with instant invoice"
+            >
+              <PlusCircle className="w-4 h-4" />
+              <span>+ New Client Order</span>
+            </button>
+            <button
               onClick={async () => {
-                const res = await seedDemoOrder();
-                if (res.success) {
-                  alert(`Test Order (${res.order?.id}) created successfully!`);
+                if (window.confirm('Are you sure you want to clean all demo/seed orders?')) {
+                  await clearAllDemoOrders();
+                  alert('All demo orders cleared. The order board is now ready for real client orders!');
                 }
               }}
-              className="px-3.5 py-2.5 rounded-xl bg-rose-600/20 hover:bg-rose-600/30 border border-rose-500/40 text-rose-300 text-xs font-bold transition-colors cursor-pointer flex items-center gap-2"
-              title="Create a live test client order to test invoice, approval & delivery flow"
+              className="px-3 py-2.5 rounded-xl bg-neutral-900 hover:bg-rose-950/40 border border-neutral-800 hover:border-rose-900/50 text-neutral-400 hover:text-rose-400 text-xs font-semibold transition-colors cursor-pointer flex items-center gap-1.5"
+              title="Remove any lingering demo test orders from database and cache"
             >
-              <span>+ Create Test Order</span>
+              <Trash2 className="w-3.5 h-3.5" />
+              <span>Purge Demo Data</span>
             </button>
             <button
               onClick={onBackToLanding}
@@ -453,14 +532,22 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                           </span>
                         </div>
 
-                        <div className="flex items-center gap-2">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <button
+                            onClick={() => setSelectedDetailOrder(order)}
+                            className="px-3 py-1.5 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-bold flex items-center gap-1.5 border border-rose-500/40 cursor-pointer shadow-sm"
+                            title="Open full order details breakdown"
+                          >
+                            <Eye className="w-3.5 h-3.5" />
+                            <span>View Full Details</span>
+                          </button>
                           {order.status === 'Pending Verification' && (
                             <button
                               onClick={() => handleQuickVerifyAdvance(order.id)}
                               className="px-3.5 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs flex items-center gap-1 shadow-sm cursor-pointer"
                             >
                               <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Verify 30% Advance & Start</span>
+                              <span>Verify 30% Advance</span>
                             </button>
                           )}
                           <button
@@ -486,7 +573,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                             className="px-3.5 py-1.5 rounded-lg bg-rose-500/15 hover:bg-rose-500/25 text-rose-400 border border-rose-500/40 text-xs font-bold flex items-center gap-1 cursor-pointer"
                           >
                             <Upload className="w-3.5 h-3.5" />
-                            <span>Release Delivery Link</span>
+                            <span>Delivery Link</span>
                           </button>
                           <button
                             onClick={() => {
@@ -508,9 +595,23 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                           <span className="text-neutral-400 uppercase text-[10px] font-bold block mb-1">Client Profile</span>
                           <div className="font-bold text-white text-sm">{order.clientName}</div>
                           <div className="text-neutral-300 font-mono text-[11px]">{order.clientEmail}</div>
-                          <div className="text-rose-400 font-semibold mt-0.5 flex items-center gap-1">
-                            <PhoneCall className="w-3 h-3" />
-                            {order.clientPhone}
+                          <div className="mt-1 flex items-center gap-2">
+                            <a
+                              href={`tel:${order.clientPhone}`}
+                              className="text-rose-400 font-semibold flex items-center gap-1 hover:underline"
+                            >
+                              <PhoneCall className="w-3 h-3" />
+                              {order.clientPhone}
+                            </a>
+                            <a
+                              href={`https://wa.me/${(order.clientPhone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${order.clientName}, regarding your Beyond Pixels Order #${order.id}`)}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="px-1.5 py-0.5 rounded bg-emerald-500/20 text-emerald-400 font-bold text-[10px] hover:bg-emerald-500/30"
+                              title="Chat on WhatsApp"
+                            >
+                              WhatsApp
+                            </a>
                           </div>
                         </div>
 
@@ -549,7 +650,19 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                           <div className="p-2.5 rounded-lg bg-[#050505] border border-neutral-800 space-y-0.5">
                             <div className="font-bold text-rose-400 flex items-center justify-between">
                               <span>{order.paymentMethod}</span>
-                              <span className="font-mono text-white text-[11px]">{order.transactionId}</span>
+                              <button
+                                type="button"
+                                onClick={() => handleCopyTrx(order.transactionId)}
+                                className="font-mono text-white text-[11px] hover:text-rose-300 flex items-center gap-1 cursor-pointer bg-neutral-900 px-1.5 py-0.5 rounded border border-neutral-700"
+                                title="Click to copy Transaction ID"
+                              >
+                                <span>{order.transactionId}</span>
+                                {copiedTrxId === order.transactionId ? (
+                                  <Check className="w-3 h-3 text-emerald-400" />
+                                ) : (
+                                  <Copy className="w-3 h-3 text-neutral-400" />
+                                )}
+                              </button>
                             </div>
                             <div className="text-[10px] text-neutral-500">Sent to: {order.paymentNumber}</div>
                           </div>
@@ -1462,6 +1575,411 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({ onBackToLanding 
                   Save Status
                 </button>
               </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: FULL ORDER DETAILS BREAKDOWN */}
+      <AnimatePresence>
+        {selectedDetailOrder && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setSelectedDetailOrder(null)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95, y: 20 }}
+              animate={{ opacity: 1, scale: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95, y: 20 }}
+              className="relative w-full max-w-3xl max-h-[90vh] overflow-y-auto bg-[#0D0D0D] border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white z-10 space-y-6"
+            >
+              {/* Modal Header */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-neutral-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center text-rose-500 font-mono font-black text-sm">
+                    {selectedDetailOrder.id.slice(-4)}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-xl font-black text-white font-mono">{selectedDetailOrder.id}</h2>
+                      <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                        selectedDetailOrder.status === 'Pending Verification'
+                          ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                          : selectedDetailOrder.status === 'Completed'
+                          ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                          : selectedDetailOrder.status === 'In Progress' || selectedDetailOrder.status === 'In Review'
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                          : 'bg-rose-500/20 text-rose-400 border border-rose-500/30'
+                      }`}>
+                        {selectedDetailOrder.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-neutral-400 mt-0.5">
+                      Created: {new Date(selectedDetailOrder.createdAt).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' })} • Delivery: <span className="text-white capitalize">{selectedDetailOrder.deliveryTimeframe}</span>
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      const ord = selectedDetailOrder;
+                      setSelectedInvoiceOrder(ord);
+                    }}
+                    className="px-3.5 py-2 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs flex items-center gap-1.5 shadow-lg shadow-rose-600/30 cursor-pointer"
+                  >
+                    <Receipt className="w-4 h-4" />
+                    <span>Download PDF Invoice</span>
+                  </button>
+                  <button
+                    onClick={() => setSelectedDetailOrder(null)}
+                    className="p-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white cursor-pointer"
+                  >
+                    <X className="w-5 h-5" />
+                  </button>
+                </div>
+              </div>
+
+              {/* Client & Financial Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Client Profile */}
+                <div className="p-5 rounded-2xl bg-[#141414] border border-neutral-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Client Details</span>
+                    <span className="text-[10px] text-neutral-500">Authorized Account</span>
+                  </div>
+                  <div>
+                    <div className="text-base font-bold text-white">{selectedDetailOrder.clientName}</div>
+                    <a href={`mailto:${selectedDetailOrder.clientEmail}`} className="text-xs text-neutral-400 hover:text-rose-400 font-mono block mt-0.5">
+                      {selectedDetailOrder.clientEmail}
+                    </a>
+                  </div>
+                  <div className="flex items-center gap-2 pt-1">
+                    <a
+                      href={`tel:${selectedDetailOrder.clientPhone}`}
+                      className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-rose-400 text-xs font-semibold flex items-center gap-1.5 border border-neutral-700"
+                    >
+                      <PhoneCall className="w-3.5 h-3.5" />
+                      <span>{selectedDetailOrder.clientPhone}</span>
+                    </a>
+                    <a
+                      href={`https://wa.me/${(selectedDetailOrder.clientPhone || '').replace(/[^0-9]/g, '')}?text=${encodeURIComponent(`Hello ${selectedDetailOrder.clientName}, regarding your Beyond Pixels Order #${selectedDetailOrder.id}`)}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="px-3 py-1.5 rounded-lg bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-xs font-bold flex items-center gap-1.5 border border-emerald-500/30"
+                    >
+                      <span>WhatsApp Chat</span>
+                    </a>
+                  </div>
+                </div>
+
+                {/* Financial Ledger */}
+                <div className="p-5 rounded-2xl bg-[#141414] border border-neutral-800/80 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Financial Breakdown</span>
+                    <span className="text-[10px] font-mono text-emerald-400 font-bold">BDT Currency</span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="p-2.5 rounded-xl bg-neutral-900/90 border border-neutral-800">
+                      <div className="text-[10px] text-neutral-400">Total Value</div>
+                      <div className="text-sm font-black text-white mt-0.5">
+                        ৳{(selectedDetailOrder.estimatedTotalBDT || (selectedDetailOrder as any).estimatedTotal || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-emerald-950/40 border border-emerald-800/40">
+                      <div className="text-[10px] text-emerald-400">30% Advance</div>
+                      <div className="text-sm font-black text-emerald-400 mt-0.5">
+                        ৳{(selectedDetailOrder.advanceAmountBDT || (selectedDetailOrder as any).advanceAmount || 0).toLocaleString()}
+                      </div>
+                    </div>
+                    <div className="p-2.5 rounded-xl bg-amber-950/30 border border-amber-800/40">
+                      <div className="text-[10px] text-amber-400">70% Due</div>
+                      <div className="text-sm font-black text-amber-300 mt-0.5">
+                        ৳{(
+                          (selectedDetailOrder.estimatedTotalBDT || (selectedDetailOrder as any).estimatedTotal || 0) -
+                          (selectedDetailOrder.advanceAmountBDT || (selectedDetailOrder as any).advanceAmount || 0)
+                        ).toLocaleString()}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between text-xs pt-1 px-1">
+                    <span className="text-neutral-400">Method: <strong className="text-white">{selectedDetailOrder.paymentMethod}</strong> ({selectedDetailOrder.paymentNumber})</span>
+                    <button
+                      type="button"
+                      onClick={() => handleCopyTrx(selectedDetailOrder.transactionId)}
+                      className="font-mono text-[11px] text-rose-400 bg-neutral-900 px-2 py-0.5 rounded border border-neutral-700 flex items-center gap-1 cursor-pointer"
+                    >
+                      <span>Trx: {selectedDetailOrder.transactionId}</span>
+                      {copiedTrxId === selectedDetailOrder.transactionId ? <Check className="w-3 h-3 text-emerald-400" /> : <Copy className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Scope & Services */}
+              <div className="p-5 rounded-2xl bg-[#141414] border border-neutral-800/80 space-y-3">
+                <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider block">Scope of Work & Deliverables</span>
+                <div className="flex flex-wrap gap-2">
+                  {selectedDetailOrder.packageSelected && (
+                    <span className="px-3 py-1 rounded-xl bg-rose-600/20 border border-rose-500/40 text-rose-300 text-xs font-bold">
+                      📦 Package: {selectedDetailOrder.packageSelected}
+                    </span>
+                  )}
+                  {selectedDetailOrder.services.map((srv, i) => (
+                    <span key={i} className="px-3 py-1 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-medium">
+                      {srv}
+                    </span>
+                  ))}
+                  {selectedDetailOrder.subServices?.map((sub, i) => (
+                    <span key={i} className="px-2.5 py-1 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 text-xs">
+                      + {sub.title} (৳{sub.priceBDT.toLocaleString()})
+                    </span>
+                  ))}
+                </div>
+                {selectedDetailOrder.projectDescription && (
+                  <div className="mt-3 p-3.5 rounded-xl bg-[#090909] border border-neutral-800 text-xs">
+                    <span className="text-neutral-500 font-bold uppercase text-[10px] block mb-1">Client Project Brief & Instructions:</span>
+                    <p className="text-neutral-200 whitespace-pre-wrap leading-relaxed">{selectedDetailOrder.projectDescription}</p>
+                  </div>
+                )}
+              </div>
+
+              {/* Deliveries & Release Section */}
+              <div className="p-5 rounded-2xl bg-[#141414] border border-neutral-800/80 space-y-3">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-bold text-neutral-400 uppercase tracking-wider">Client Deliverables & Assets</span>
+                  <button
+                    onClick={() => {
+                      setSelectedDetailOrder(null);
+                      handleOpenDeliveryModal(selectedDetailOrder);
+                    }}
+                    className="px-3 py-1 rounded-lg bg-rose-600/20 hover:bg-rose-600/30 text-rose-300 text-xs font-bold border border-rose-500/40 flex items-center gap-1 cursor-pointer"
+                  >
+                    <Upload className="w-3 h-3" />
+                    <span>+ Release Deliverable Link</span>
+                  </button>
+                </div>
+                {selectedDetailOrder.deliveries && selectedDetailOrder.deliveries.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedDetailOrder.deliveries.map((deliv) => (
+                      <div key={deliv.id} className="p-3 rounded-xl bg-neutral-900 border border-neutral-800 flex items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-bold text-emerald-400 flex items-center gap-1.5">
+                            <CheckCircle2 className="w-3.5 h-3.5" />
+                            {deliv.title}
+                          </div>
+                          {deliv.notes && <p className="text-[11px] text-neutral-400 mt-0.5">{deliv.notes}</p>}
+                        </div>
+                        <a
+                          href={deliv.linkOrData}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="px-3 py-1.5 rounded-lg bg-neutral-800 hover:bg-neutral-700 text-xs font-semibold text-white flex items-center gap-1"
+                        >
+                          <span>Open Link</span>
+                          <ExternalLink className="w-3 h-3" />
+                        </a>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-neutral-500 italic py-1">No final files or links published for this order yet.</p>
+                )}
+              </div>
+
+              {/* Action Buttons Footer */}
+              <div className="flex flex-wrap items-center justify-end gap-3 pt-2">
+                {selectedDetailOrder.status === 'Pending Verification' && (
+                  <button
+                    onClick={async () => {
+                      await handleQuickVerifyAdvance(selectedDetailOrder.id);
+                      setSelectedDetailOrder(null);
+                    }}
+                    className="px-4 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold text-xs flex items-center gap-1.5 cursor-pointer shadow-md"
+                  >
+                    <CheckCircle2 className="w-4 h-4" />
+                    <span>Verify 30% Advance & Start Order</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => {
+                    const ord = selectedDetailOrder;
+                    setSelectedDetailOrder(null);
+                    setStatusModalOrder(ord);
+                    setNewStatus(ord.status);
+                    setAdminNotesText(ord.adminNotes || '');
+                  }}
+                  className="px-4 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-semibold text-xs border border-neutral-700 cursor-pointer"
+                >
+                  Edit Status & Internal Notes
+                </button>
+                <button
+                  onClick={() => setSelectedDetailOrder(null)}
+                  className="px-4 py-2.5 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white text-xs font-semibold cursor-pointer"
+                >
+                  Close Details
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* MODAL: CREATE CUSTOM CLIENT ORDER */}
+      <AnimatePresence>
+        {showCreateOrderModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              onClick={() => setShowCreateOrderModal(false)}
+              className="fixed inset-0 bg-black/80 backdrop-blur-md"
+            />
+
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="relative w-full max-w-lg bg-[#0D0D0D] border border-neutral-800 rounded-3xl p-6 sm:p-8 shadow-2xl text-white z-10 space-y-4"
+            >
+              <div className="flex items-center justify-between pb-3 border-b border-neutral-800">
+                <div>
+                  <h3 className="text-lg font-black text-white">Create Custom Client Order</h3>
+                  <p className="text-xs text-neutral-400">Register direct client project & auto-generate invoice</p>
+                </div>
+                <button onClick={() => setShowCreateOrderModal(false)} className="text-neutral-400 hover:text-white cursor-pointer">
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              <form onSubmit={handleCreateCustomOrder} className="space-y-3.5 text-xs">
+                <div>
+                  <label className="block text-neutral-300 font-semibold mb-1">Client Full Name *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Tanvir Ahmed"
+                    value={newOrderClientName}
+                    onChange={(e) => setNewOrderClientName(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-neutral-300 font-semibold mb-1">Client Email *</label>
+                    <input
+                      type="email"
+                      required
+                      placeholder="client@example.com"
+                      value={newOrderClientEmail}
+                      onChange={(e) => setNewOrderClientEmail(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-neutral-300 font-semibold mb-1">Client Phone / WhatsApp</label>
+                    <input
+                      type="text"
+                      placeholder="+880 1700-000000"
+                      value={newOrderClientPhone}
+                      onChange={(e) => setNewOrderClientPhone(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-neutral-300 font-semibold mb-1">Primary Service</label>
+                    <select
+                      value={newOrderService}
+                      onChange={(e) => setNewOrderService(e.target.value)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500"
+                    >
+                      <option value="Graphic Design">Graphic Design</option>
+                      <option value="Video Editing">Video Editing</option>
+                      <option value="Meta Ads Marketing">Meta Ads Marketing</option>
+                      <option value="Web Development">Web Development</option>
+                      <option value="Full Agency Package">Full Agency Package</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-neutral-300 font-semibold mb-1">Total Budget (BDT) *</label>
+                    <input
+                      type="number"
+                      required
+                      min="500"
+                      step="500"
+                      value={newOrderTotalBDT}
+                      onChange={(e) => setNewOrderTotalBDT(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500 font-bold"
+                    />
+                    <span className="text-[10px] text-neutral-400 mt-0.5 block">
+                      30% Advance: ৳{Math.round((Number(newOrderTotalBDT) || 0) * 0.3).toLocaleString()}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-neutral-300 font-semibold mb-1">Payment Method</label>
+                    <select
+                      value={newOrderPaymentMethod}
+                      onChange={(e) => setNewOrderPaymentMethod(e.target.value as any)}
+                      className="w-full px-3 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500"
+                    >
+                      <option value="bKash">bKash (01965407715)</option>
+                      <option value="Nagad">Nagad (01965407715)</option>
+                      <option value="Bank Transfer">Bank Transfer (City Bank)</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-neutral-300 font-semibold mb-1">Transaction ID / Ref</label>
+                    <input
+                      type="text"
+                      placeholder="e.g. 9K29XJ381"
+                      value={newOrderTrxId}
+                      onChange={(e) => setNewOrderTrxId(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500 uppercase font-mono"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-neutral-300 font-semibold mb-1">Project Brief / Scope Notes</label>
+                  <textarea
+                    rows={2}
+                    placeholder="Project requirements, deliverable specifications, or client notes..."
+                    value={newOrderBrief}
+                    onChange={(e) => setNewOrderBrief(e.target.value)}
+                    className="w-full px-3.5 py-2.5 rounded-xl bg-[#141414] border border-neutral-800 text-xs text-white focus:border-rose-500"
+                  />
+                </div>
+
+                <div className="flex gap-2 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setShowCreateOrderModal(false)}
+                    className="flex-1 py-2.5 rounded-xl border border-neutral-700 text-xs font-semibold hover:bg-neutral-800 transition-colors cursor-pointer"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    disabled={isCreatingCustomOrder}
+                    className="flex-2 py-2.5 rounded-xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider cursor-pointer shadow-lg shadow-rose-600/30"
+                  >
+                    {isCreatingCustomOrder ? 'Creating Order...' : 'Create & Generate Invoice'}
+                  </button>
+                </div>
+              </form>
             </motion.div>
           </div>
         )}
