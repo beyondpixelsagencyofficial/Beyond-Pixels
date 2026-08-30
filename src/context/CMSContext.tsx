@@ -23,7 +23,8 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       setIsLoading(true);
       const res = await fetch('/api/cms');
       if (!res.ok) throw new Error('Failed to fetch CMS content');
-      const data = await res.json();
+      const text = await res.text();
+      const data = JSON.parse(text);
       setCms(data);
       setError(null);
     } catch (err: any) {
@@ -49,12 +50,18 @@ export const CMSProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         body: JSON.stringify(newContent)
       });
 
+      const text = await res.text();
+      let data: any = {};
+      try {
+        data = JSON.parse(text);
+      } catch (parseErr) {
+        data = {};
+      }
+
       if (!res.ok) {
-        const data = await res.json();
         throw new Error(data.error || 'Failed to update CMS');
       }
 
-      const data = await res.json();
       if (data.cms) {
         setCms(data.cms);
       } else {

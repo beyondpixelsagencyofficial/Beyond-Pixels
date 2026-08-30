@@ -39,9 +39,16 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({ isOpen, on
     if (isOpen && isAuthenticated && user?.email) {
       setIsLoading(true);
       fetch(`/api/orders/track?query=${encodeURIComponent(user.email)}`)
-        .then(res => res.json())
+        .then(async res => {
+          const text = await res.text();
+          try {
+            return JSON.parse(text);
+          } catch {
+            return null;
+          }
+        })
         .then(data => {
-          if (data.results && data.results.length > 0) {
+          if (data && data.results && data.results.length > 0) {
             setOrders(data.results);
           }
         })
@@ -62,11 +69,18 @@ export const OrderTrackerModal: React.FC<OrderTrackerModalProps> = ({ isOpen, on
 
     try {
       const res = await fetch(`/api/orders/track?query=${encodeURIComponent(searchQuery.trim())}`);
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.error || 'No matching order found.');
+      const text = await res.text();
+      let data: any = null;
+      try {
+        data = JSON.parse(text);
+      } catch {
+        throw new Error('সার্ভার থেকে সঠিক ফরম্যাটে তথ্য পাওয়া যায়নি।');
       }
-      setOrders(data.results || []);
+
+      if (!res.ok) {
+        throw new Error(data?.error || 'No matching order found.');
+      }
+      setOrders(data?.results || []);
     } catch (err: any) {
       setError(err.message || 'Could not find any order with this code or phone number.');
     } finally {

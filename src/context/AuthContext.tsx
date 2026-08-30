@@ -47,17 +47,36 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const openAuthModal = () => setIsAuthModalOpen(true);
   const closeAuthModal = () => setIsAuthModalOpen(false);
 
+  // Helper for safe JSON responses
+  const safeJson = async (res: Response) => {
+    const text = await res.text();
+    try {
+      return JSON.parse(text);
+    } catch {
+      return null;
+    }
+  };
+
   // Standard Login with Email and Password
   const login = async (email: string, password: string): Promise<User> => {
     const normalizedEmail = email.trim().toLowerCase();
     
-    const res = await fetch('/api/auth/login', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email: normalizedEmail, password })
-    });
+    let res: Response;
+    try {
+      res = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail, password })
+      });
+    } catch (networkErr: any) {
+      throw new Error('ইন্টারনেট বা সার্ভার সংযোগে সমস্যা হচ্ছে। অনুগ্রহ করে একটু পর আবার চেষ্টা করুন।');
+    }
 
-    const data = await res.json();
+    const data = await safeJson(res);
+    if (!data) {
+      throw new Error(`সার্ভার থেকে সঠিক ফরম্যাটে রেসপন্স পাওয়া যায়নি (${res.status})।`);
+    }
+
     if (!res.ok || !data.success || !data.user) {
       throw new Error(data.error || 'লগইন ব্যর্থ হয়েছে। অনুগ্রহ করে সঠিক তথ্য দিন।');
     }
@@ -82,19 +101,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   ): Promise<User> => {
     const normalizedEmail = email.trim().toLowerCase();
 
-    const res = await fetch('/api/auth/register', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        name: name.trim(),
-        email: normalizedEmail,
-        phone: phone.trim(),
-        password,
-        company: company?.trim() || ''
-      })
-    });
+    let res: Response;
+    try {
+      res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: name.trim(),
+          email: normalizedEmail,
+          phone: phone.trim(),
+          password,
+          company: company?.trim() || ''
+        })
+      });
+    } catch (networkErr: any) {
+      throw new Error('ইন্টারনেট বা সার্ভার সংযোগে সমস্যা হচ্ছে। অনুগ্রহ করে একটু পর আবার চেষ্টা করুন।');
+    }
 
-    const data = await res.json();
+    const data = await safeJson(res);
+    if (!data) {
+      throw new Error(`সার্ভার থেকে সঠিক ফরম্যাটে রেসপন্স পাওয়া যায়নি (${res.status})।`);
+    }
+
     if (!res.ok || !data.success || !data.user) {
       throw new Error(data.error || 'অ্যাকাউন্ট রেজিস্ট্রেশন সম্পন্ন করা সম্ভব হয়নি।');
     }

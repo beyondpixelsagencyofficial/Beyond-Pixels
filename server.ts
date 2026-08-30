@@ -1377,6 +1377,20 @@ app.get('/api/stats', (req: Request, res: Response) => {
   });
 });
 
+// Explicit 404 JSON response for any unmatched API route (Prevents returning HTML to API fetches)
+app.all('/api/*', (req: Request, res: Response) => {
+  res.status(404).json({ error: `API route not found: ${req.method} ${req.originalUrl}` });
+});
+
+// API Error Handler
+app.use((err: any, req: Request, res: Response, next: any) => {
+  if (req.path.startsWith('/api')) {
+    console.error('API Error:', err);
+    return res.status(err.status || 500).json({ error: err.message || 'Internal Server Error' });
+  }
+  next(err);
+});
+
 // ---------------- SERVER BOOTSTRAP ----------------
 async function startServer() {
   // Sync with Supabase on startup non-blockingly

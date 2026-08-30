@@ -15,7 +15,13 @@ import {
   ChevronDown,
   Search,
   Flame,
-  Phone
+  Phone,
+  Home,
+  Palette,
+  ShoppingCart,
+  Mail,
+  Zap,
+  Lock
 } from 'lucide-react';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -335,8 +341,9 @@ export const Header: React.FC<HeaderProps> = ({
           )}
         </div>
 
-        {/* Mobile menu button */}
-        <div className="flex md:hidden items-center gap-2">
+        {/* Mobile quick action icons */}
+        <div className="flex md:hidden items-center gap-1.5 sm:gap-2">
+          {/* Quick Track Button */}
           <button
             onClick={() => {
               if (!isAuthenticated) {
@@ -345,26 +352,31 @@ export const Header: React.FC<HeaderProps> = ({
                 onOpenTrackerModal();
               }
             }}
-            className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-rose-500"
+            className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-rose-500 bg-rose-500/5 hover:bg-rose-500/10 transition-colors"
             title="Track Order"
+            aria-label="Track Order"
           >
             <Search className="w-4 h-4" />
           </button>
 
+          {/* Theme Toggle */}
           <button
             id="mobile-theme-toggle-btn"
             onClick={toggleTheme}
-            className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300"
+            aria-label="Toggle Theme"
+            className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-600 dark:text-neutral-300 hover:bg-neutral-100 dark:hover:bg-neutral-900 transition-colors"
           >
             {theme === 'dark' ? <Sun className="w-4 h-4 text-amber-400" /> : <Moon className="w-4 h-4 text-neutral-700" />}
           </button>
 
+          {/* Mobile Drawer Trigger */}
           <button
             id="mobile-menu-toggle-btn"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="p-2 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200"
+            aria-label="Toggle Navigation Menu"
+            className="p-2.5 rounded-xl border border-neutral-200 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 bg-neutral-100/80 dark:bg-neutral-900/80 hover:bg-neutral-200 dark:hover:bg-neutral-800 transition-colors"
           >
-            {mobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+            {mobileMenuOpen ? <X className="w-5 h-5 text-rose-500" /> : <Menu className="w-5 h-5" />}
           </button>
         </div>
       </div>
@@ -376,55 +388,76 @@ export const Header: React.FC<HeaderProps> = ({
             initial={{ opacity: 0, height: 0 }}
             animate={{ opacity: 1, height: 'auto' }}
             exit={{ opacity: 0, height: 0 }}
-            className="md:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-[#080808]/95 backdrop-blur-xl px-4 py-6 space-y-4"
+            className="md:hidden border-b border-neutral-200 dark:border-neutral-800 bg-white/95 dark:bg-[#0a0a0a]/95 backdrop-blur-xl px-4 py-5 space-y-4 shadow-2xl"
           >
-            <div className="space-y-2">
+            <div className="space-y-1.5">
               <button
                 onClick={() => handleNavClick('hero-section')}
-                className="w-full text-left py-2 text-sm font-bold text-neutral-800 dark:text-neutral-200"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800/60 text-left font-bold text-neutral-800 dark:text-neutral-200 hover:text-rose-500 transition-all text-sm"
               >
-                Home
+                <span className="flex items-center gap-3">
+                  <Home className="w-4 h-4 text-rose-500" />
+                  <span>হোম (Home)</span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-neutral-400" />
               </button>
+
               <button
                 onClick={() => handleNavClick('services-section')}
-                className="w-full text-left py-2 text-sm font-bold text-neutral-800 dark:text-neutral-200"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800/60 text-left font-bold text-neutral-800 dark:text-neutral-200 hover:text-rose-500 transition-all text-sm"
               >
-                Services
+                <span className="flex items-center gap-3">
+                  <Palette className="w-4 h-4 text-rose-500" />
+                  <span>সার্ভিস সমূহ (Services)</span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-neutral-400" />
               </button>
+
               <button
                 onClick={() => handleNavClick('packages-section')}
-                className="w-full text-left py-2 text-sm font-bold text-neutral-800 dark:text-neutral-200"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800/60 text-left font-bold text-neutral-800 dark:text-neutral-200 hover:text-rose-500 transition-all text-sm"
               >
-                Packages & Ad Boost
+                <span className="flex items-center gap-3">
+                  <Layers className="w-4 h-4 text-rose-500" />
+                  <span>প্যাকেজ ও বুস্টিং (Packages & Ad Boost)</span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-neutral-400" />
               </button>
+
               <button
                 onClick={() => handleNavClick('order-section')}
-                className="w-full text-left py-2 text-sm font-bold text-neutral-800 dark:text-neutral-200"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800/60 text-left font-bold text-neutral-800 dark:text-neutral-200 hover:text-rose-500 transition-all text-sm"
               >
-                Order / Checkout
+                <span className="flex items-center gap-3">
+                  <ShoppingCart className="w-4 h-4 text-rose-500" />
+                  <span>অর্ডার ও প্রাইসিং (Order / Pricing)</span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-neutral-400" />
               </button>
+
               <button
                 onClick={() => handleNavClick('contact-section')}
-                className="w-full text-left py-2 text-sm font-bold text-neutral-800 dark:text-neutral-200"
+                className="w-full flex items-center justify-between p-3 rounded-2xl bg-neutral-50 dark:bg-neutral-900/60 border border-neutral-200/60 dark:border-neutral-800/60 text-left font-bold text-neutral-800 dark:text-neutral-200 hover:text-rose-500 transition-all text-sm"
               >
-                Contact
+                <span className="flex items-center gap-3">
+                  <Mail className="w-4 h-4 text-rose-500" />
+                  <span>যোগাযোগ (Contact Squad)</span>
+                </span>
+                <ChevronDown className="w-3.5 h-3.5 -rotate-90 text-neutral-400" />
               </button>
             </div>
 
-            <div className="pt-4 border-t border-neutral-200 dark:border-neutral-800 space-y-3">
+            <div className="pt-3 border-t border-neutral-200 dark:border-neutral-800 space-y-2.5">
               <button
                 onClick={() => {
                   setMobileMenuOpen(false);
-                  if (!isAuthenticated) {
-                    openAuthModal();
-                  } else {
-                    if (currentView !== 'landing') setCurrentView('landing');
-                    onOpenOrderModal();
-                  }
+                  if (currentView !== 'landing') setCurrentView('landing');
+                  handleNavClick('order-section');
                 }}
-                className="w-full py-3 rounded-xl bg-rose-600 text-white font-bold text-xs uppercase tracking-wider text-center cursor-pointer shadow-lg shadow-rose-600/20"
+                className="w-full py-3.5 rounded-2xl bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs uppercase tracking-wider text-center cursor-pointer shadow-lg shadow-rose-600/30 flex items-center justify-center gap-2 transition-transform active:scale-[0.98]"
               >
-                Place Order / Get Started
+                <Zap className="w-4 h-4" />
+                <span>নতুন অর্ডার করুন (Place Order)</span>
               </button>
 
               <button
@@ -436,10 +469,10 @@ export const Header: React.FC<HeaderProps> = ({
                     onOpenTrackerModal();
                   }
                 }}
-                className="w-full py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer"
+                className="w-full py-3 rounded-2xl border border-neutral-300 dark:border-neutral-800 text-neutral-800 dark:text-neutral-200 font-bold text-xs flex items-center justify-center gap-2 cursor-pointer hover:border-rose-500/40 transition-colors"
               >
                 <Search className="w-3.5 h-3.5 text-rose-500" />
-                <span>Track Existing Order</span>
+                <span>অর্ডার ট্র্যাক করুন (Track Order)</span>
               </button>
 
               {!isAuthenticated ? (
@@ -448,21 +481,24 @@ export const Header: React.FC<HeaderProps> = ({
                     setMobileMenuOpen(false);
                     openAuthModal();
                   }}
-                  className="w-full py-2.5 rounded-xl border border-neutral-300 dark:border-neutral-800 bg-neutral-900 text-white font-semibold text-xs flex items-center justify-center gap-2"
+                  className="w-full py-3 rounded-2xl border border-neutral-300 dark:border-neutral-800 bg-neutral-900 text-white font-bold text-xs flex items-center justify-center gap-2 cursor-pointer shadow-md"
                 >
                   <UserIcon className="w-4 h-4 text-rose-500" />
-                  সাইন ইন / লগইন (Sign In)
+                  <span>লগইন / সাইন আপ (Sign In / Register)</span>
                 </button>
               ) : (
-                <div className="space-y-2">
+                <div className="space-y-2 pt-1">
                   <button
                     onClick={() => {
                       setCurrentView('dashboard');
                       setMobileMenuOpen(false);
                     }}
-                    className="w-full py-2.5 px-3 rounded-xl bg-neutral-100 dark:bg-neutral-800 text-neutral-900 dark:text-white font-semibold text-xs flex items-center justify-between"
+                    className="w-full py-3 px-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-rose-400 font-bold text-xs flex items-center justify-between"
                   >
-                    <span>{isAdmin ? '👑 Admin Control Panel' : '📁 My Orders & Deliveries'}</span>
+                    <span className="flex items-center gap-2">
+                      <ShieldCheck className="w-4 h-4 text-rose-500" />
+                      <span>{isAdmin ? '👑 Admin Control Center' : '📁 Client Order Dashboard'}</span>
+                    </span>
                     <ArrowUpRight className="w-4 h-4" />
                   </button>
 
@@ -473,11 +509,11 @@ export const Header: React.FC<HeaderProps> = ({
                         else setCurrentView('dashboard');
                         setMobileMenuOpen(false);
                       }}
-                      className="w-full py-2.5 px-3 rounded-xl bg-neutral-100/60 dark:bg-neutral-800/60 text-neutral-900 dark:text-white font-semibold text-xs flex items-center justify-between text-left"
+                      className="w-full py-2.5 px-3.5 rounded-2xl bg-neutral-100 dark:bg-neutral-900 text-neutral-800 dark:text-neutral-300 font-semibold text-xs flex items-center justify-between text-left"
                     >
                       <span className="flex items-center gap-2">
-                        <UserIcon className="w-3.5 h-3.5 text-rose-500" />
-                        My Profile & Settings
+                        <UserIcon className="w-3.5 h-3.5 text-neutral-400" />
+                        <span>Profile & Settings</span>
                       </span>
                     </button>
                   )}
@@ -488,9 +524,10 @@ export const Header: React.FC<HeaderProps> = ({
                       setMobileMenuOpen(false);
                       setCurrentView('landing');
                     }}
-                    className="w-full py-2 px-3 text-left text-xs text-rose-500 font-medium"
+                    className="w-full py-2 px-3 text-left text-xs text-rose-500 font-semibold flex items-center gap-2"
                   >
-                    Sign Out ({user?.name})
+                    <LogOut className="w-3.5 h-3.5" />
+                    <span>লগআউট ({user?.name})</span>
                   </button>
                 </div>
               )}
@@ -498,6 +535,62 @@ export const Header: React.FC<HeaderProps> = ({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Mobile Sticky Bottom Navigation Dock (Optimized for Phone Clients) */}
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-30 bg-[#0a0a0a]/95 backdrop-blur-lg border-t border-neutral-800/80 px-2 py-1.5 safe-area-bottom shadow-2xl">
+        <div className="grid grid-cols-5 items-center gap-1 max-w-md mx-auto">
+          {/* 1. Home */}
+          <button
+            onClick={() => handleNavClick('hero-section')}
+            className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <Home className="w-4 h-4 text-rose-500 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-tight">হোম</span>
+          </button>
+
+          {/* 2. Services */}
+          <button
+            onClick={() => handleNavClick('services-section')}
+            className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <Palette className="w-4 h-4 text-neutral-300 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-tight">সার্ভিস</span>
+          </button>
+
+          {/* 3. Packages */}
+          <button
+            onClick={() => handleNavClick('packages-section')}
+            className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <Layers className="w-4 h-4 text-neutral-300 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-tight">প্যাকেজ</span>
+          </button>
+
+          {/* 4. Order */}
+          <button
+            onClick={() => handleNavClick('order-section')}
+            className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-rose-400 font-bold hover:text-rose-300 transition-colors cursor-pointer"
+          >
+            <ShoppingCart className="w-4 h-4 text-rose-500 mb-0.5" />
+            <span className="text-[10px] font-black tracking-tight">অর্ডার</span>
+          </button>
+
+          {/* 5. Track / Account */}
+          <button
+            onClick={() => {
+              if (!isAuthenticated) {
+                openAuthModal();
+              } else {
+                onOpenTrackerModal();
+              }
+            }}
+            className="flex flex-col items-center justify-center py-1.5 px-1 rounded-xl text-neutral-400 hover:text-white transition-colors cursor-pointer"
+          >
+            <Search className="w-4 h-4 text-neutral-300 mb-0.5" />
+            <span className="text-[10px] font-bold tracking-tight">ট্র্যাক</span>
+          </button>
+        </div>
+      </div>
     </header>
   );
 };

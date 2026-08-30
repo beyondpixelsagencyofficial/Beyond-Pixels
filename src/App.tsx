@@ -92,7 +92,7 @@ function MainAppContent() {
       />
 
       {/* Main View Router */}
-      <main>
+      <main className="pb-16 md:pb-0">
         {currentView === 'dashboard' ? (
           isAdmin ? (
             /* Exclusive Admin Dashboard for beyondpixelsagency.official@gmail.com */
