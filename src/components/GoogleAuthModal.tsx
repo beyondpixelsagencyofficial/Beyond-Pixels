@@ -106,7 +106,12 @@ export const GoogleAuthModal: React.FC<GoogleAuthModalProps> = ({
         }, 500);
       }
     } catch (err: any) {
-      setError(err.message || 'অনুরোধটি প্রক্রিয়া করা সম্ভব হয়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+      const rawMsg = err?.message || '';
+      if (rawMsg.includes('is not valid JSON') || rawMsg.includes('Unexpected token') || rawMsg.includes('The page c')) {
+        setError('সার্ভারের সাথে সংযোগ স্থাপন করা হচ্ছে, অনুগ্রহ করে কয়েক সেকেন্ড পর আবার চেষ্টা করুন।');
+      } else {
+        setError(rawMsg || 'অনুরোধটি প্রক্রিয়া করা সম্ভব হয়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।');
+      }
     } finally {
       setLoading(false);
     }
