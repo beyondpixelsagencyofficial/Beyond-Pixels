@@ -207,6 +207,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return registeredUser;
     }
 
+    if (res && !res.ok && data && data.error && (res.status === 400 || res.status === 409)) {
+      throw new Error(data.error);
+    }
+
     // Direct Supabase Fallback Registration
     const now = new Date().toISOString();
     const fallbackUser: User = {
